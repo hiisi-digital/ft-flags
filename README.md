@@ -11,6 +11,13 @@
 
 </div>
 
+<!-- PLATFORM_NOTICE:START -->
+<!-- This section is replaced in platform-specific builds -->
+
+> **Multi-platform package:** This package is available for both Deno ([JSR](https://jsr.io/@hiisi/ft-flags)) and Node.js/Bun ([npm](https://www.npmjs.com/package/ft-flags)). We produce slightly different builds optimized for each platform, with equivalent JSR ↔ npm package mappings where applicable.
+
+<!-- PLATFORM_NOTICE:END -->
+
 ## Overview
 
 `ft-flags` provides a robust feature flag system for TypeScript that follows the same conventions as Cargo features in Rust. Features can be:
@@ -25,6 +32,8 @@ This package serves as the foundation for conditional compilation in the `@hiisi
 
 ## Installation
 
+<!-- INSTALL:START -->
+
 ```bash
 # Deno
 deno add jsr:@hiisi/ft-flags
@@ -33,11 +42,17 @@ deno add jsr:@hiisi/ft-flags
 npm install ft-flags
 ```
 
+<!-- INSTALL:END -->
+
 ## Feature Model
 
 ### Declaring Features
 
+<!-- CONFIG_FILE:START -->
+
 Features are declared at the root level of your `deno.json` or `package.json`. The format follows Cargo's conventions:
+
+<!-- CONFIG_FILE:END -->
 
 ```json
 {
@@ -212,6 +227,8 @@ my-app --all-features
 
 ### Installation
 
+<!-- CLI_INSTALL:START -->
+
 ```bash
 # Global install via Deno
 deno install -A -n ft jsr:@hiisi/ft-flags/cli
@@ -222,6 +239,8 @@ deno run -A jsr:@hiisi/ft-flags/cli <command>
 # Or via deno task (when in a project with ft-flags)
 deno task ft <command>
 ```
+
+<!-- CLI_INSTALL:END -->
 
 ### Commands
 
@@ -335,6 +354,8 @@ $ ft check fs --package ./packages/my-lib
 
 ### Basic Usage
 
+<!-- IMPORT_EXAMPLE:START -->
+
 ```typescript
 import {
   isFeatureEnabled,
@@ -358,6 +379,8 @@ if (isFeatureEnabled("fs", resolved)) {
 const available = listAvailableFeatures(manifest);
 console.log(available); // ["default", "std", "fs", ...]
 ```
+
+<!-- IMPORT_EXAMPLE:END -->
 
 ### Custom Feature Selection
 
@@ -447,6 +470,8 @@ https://jsr.io/@hiisi/ft-flags/schema.json
 
 ## Integration with cfg-ts
 
+<!-- RELATED_IMPORT:START -->
+
 `ft-flags` is designed to work with `@hiisi/cfg-ts` for conditional compilation:
 
 ```typescript
@@ -468,6 +493,8 @@ export function modernStdLib(): void {
 }
 ```
 
+<!-- RELATED_IMPORT:END -->
+
 ## Comparison with Cargo
 
 | Cargo                   | ft-flags                | Notes                                |
@@ -483,10 +510,14 @@ export function modernStdLib(): void {
 
 ## Related Packages
 
+<!-- RELATED_PACKAGES:START -->
+
 - [`@hiisi/cfg-ts`](https://jsr.io/@hiisi/cfg-ts) - Conditional compilation with `@cfg()` syntax
 - [`@hiisi/otso`](https://jsr.io/@hiisi/otso) - Build framework that orchestrates feature-based builds
 - [`@hiisi/tgts`](https://jsr.io/@hiisi/tgts) - Target definitions (runtime, platform, arch)
 - [`@hiisi/onlywhen`](https://jsr.io/@hiisi/onlywhen) - Runtime feature detection
+
+<!-- RELATED_PACKAGES:END -->
 
 ## Support
 

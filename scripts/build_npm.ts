@@ -11,6 +11,7 @@
  */
 
 import { build, emptyDir } from "jsr:@deno/dnt@0.41.3";
+import { generateReadme, PLATFORMS } from "./generate_readme.ts";
 
 const version = Deno.args[0];
 
@@ -101,11 +102,16 @@ await build({
     },
   },
   // Post-build steps
-  postBuild(): void {
+  async postBuild(): Promise<void> {
     // Copy additional files
     Deno.copyFileSync("LICENSE", `${outDir}/LICENSE`);
-    Deno.copyFileSync("README.md", `${outDir}/README.md`);
     Deno.copyFileSync("schema.json", `${outDir}/schema.json`);
+
+    // Generate Node.js-specific README from template
+    console.log("Generating Node.js-specific README...");
+    const template = await Deno.readTextFile("README.md");
+    const nodeReadme = generateReadme(template, PLATFORMS.node);
+    await Deno.writeTextFile(`${outDir}/README.md`, nodeReadme);
 
     // Create a Node.js-compatible CLI wrapper
     const cliWrapper = `#!/usr/bin/env node
