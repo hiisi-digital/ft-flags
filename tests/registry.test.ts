@@ -8,20 +8,20 @@ import { assertEquals, assertThrows } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 
 import {
-    cloneRegistry,
-    createRegistry,
-    createSimpleRegistry,
-    disableFeature,
-    enableFeature,
-    getFeature,
-    getFeatureState,
-    isDisabled,
-    isEnabled,
-    listDisabledFeatures,
-    listEnabledFeatures,
-    listFeatures,
-    requireFeature,
-    setFeatureState,
+  cloneRegistry,
+  createRegistry,
+  createSimpleRegistry,
+  disableFeature,
+  enableFeature,
+  getFeature,
+  getFeatureState,
+  isDisabled,
+  isEnabled,
+  listDisabledFeatures,
+  listEnabledFeatures,
+  listFeatures,
+  requireFeature,
+  setFeatureState,
 } from "../src/registry.ts";
 import { buildSchema } from "../src/schema.ts";
 import { featureId } from "../src/types.ts";
@@ -262,7 +262,7 @@ describe("FeatureRegistry", () => {
 
       assertThrows(
         () => requireFeature(registry, featureId("my-feature")),
-        Error
+        Error,
       );
     });
   });

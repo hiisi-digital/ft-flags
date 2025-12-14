@@ -34,9 +34,9 @@
       "examples": [
         {
           "default": ["std"],
-          "std": ["shimp.fs", "shimp.env"],
-          "shimp.fs": [],
-          "shimp.env": [],
+          "std": ["fs", "env"],
+          "fs": [],
+          "env": [],
           "experimental": []
         }
       ]
@@ -51,7 +51,7 @@
       "examples": [
         [],
         ["std"],
-        ["shimp.fs", "shimp.env", "shimp.args"]
+        ["fs", "env", "args"]
       ]
     },
     "FeatureId": {

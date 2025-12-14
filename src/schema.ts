@@ -2,19 +2,19 @@
  * Feature flag schema validation.
  *
  * Provides functions to validate feature schemas and definitions,
- * detect circular dependencies, and build schema structures.
+ * and build schema structures for flat (non-hierarchical) features.
  *
  * @module
  */
 
 import {
-    type FeatureDefinition,
-    type FeatureDefinitionInput,
-    type FeatureId,
-    type FeatureSchema,
-    featureId,
-    FeatureSchemaError,
-    isValidFeatureId,
+  type FeatureDefinition,
+  type FeatureDefinitionInput,
+  type FeatureId,
+  featureId,
+  type FeatureSchema,
+  FeatureSchemaError,
+  isValidFeatureId,
 } from "./types.ts";
 
 /**
@@ -75,7 +75,7 @@ export function validateFeatureId(id: string): ValidationResult {
 
   if (!isValidFeatureId(id)) {
     errors.push(
-      `Invalid feature ID "${id}": must be kebab-case (e.g., 'async-runtime')`
+      `Invalid feature ID "${id}": must be kebab-case (e.g., 'async-runtime')`,
     );
   }
 
@@ -98,7 +98,7 @@ export function validateFeatureId(id: string): ValidationResult {
  * @returns Validation result
  */
 export function validateFeatureDefinition(
-  definition: FeatureDefinitionInput
+  definition: FeatureDefinitionInput,
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -112,7 +112,7 @@ export function validateFeatureDefinition(
   if (definition.metadata) {
     if (definition.metadata.deprecated && !definition.metadata.deprecationMessage) {
       warnings.push(
-        `Feature "${definition.id}" is marked deprecated but has no deprecation message`
+        `Feature "${definition.id}" is marked deprecated but has no deprecation message`,
       );
     }
 
@@ -120,7 +120,7 @@ export function validateFeatureDefinition(
       // Basic semver-ish check
       if (!/^\d+\.\d+/.test(definition.metadata.since)) {
         warnings.push(
-          `Feature "${definition.id}" has an unusual 'since' version format: "${definition.metadata.since}"`
+          `Feature "${definition.id}" has an unusual 'since' version format: "${definition.metadata.since}"`,
         );
       }
     }
@@ -157,31 +157,11 @@ export function validateSchema(definitions: FeatureDefinitionInput[]): Validatio
     seenIds.add(def.id);
   }
 
-  // Check for circular dependencies
-  const circularPaths = detectCircularDependencies(definitions);
-  for (const path of circularPaths) {
-    errors.push(`Circular dependency detected: ${path}`);
-  }
-
   return {
     valid: errors.length === 0,
     errors,
     warnings,
   };
-}
-
-/**
- * Detects circular dependencies in feature definitions.
- * With flat features, this is a no-op since there's no hierarchy.
- * Kept for API compatibility with the legacy schema system.
- *
- * @param _definitions - Array of feature definitions to check (unused)
- * @returns Empty array (flat features have no hierarchy to create cycles)
- */
-export function detectCircularDependencies(_definitions: FeatureDefinitionInput[]): string[] {
-  // Flat features have no parent-child hierarchy, so no cycles are possible
-  // Circular dependencies in the manifest system are handled by manifest.ts
-  return [];
 }
 
 /**
@@ -196,16 +176,15 @@ export function buildSchema(definitions: FeatureDefinitionInput[]): FeatureSchem
   const validation = validateSchema(definitions);
   if (!validation.valid) {
     throw new FeatureSchemaError(
-      `Schema validation failed:\n${validation.errors.join("\n")}`
+      `Schema validation failed:\n${validation.errors.join("\n")}`,
     );
   }
 
   // Build the feature map
   const features = new Map<FeatureId, FeatureDefinition>();
-  const childrenMap = new Map<FeatureId, FeatureId[]>();
-  const roots: FeatureId[] = [];
+  const allFeatures: FeatureId[] = [];
 
-  // Create all feature definitions (flat, no parent-child hierarchy)
+  // Create all feature definitions (flat, no hierarchy)
   for (const input of definitions) {
     const id = featureId(input.id);
 
@@ -213,30 +192,17 @@ export function buildSchema(definitions: FeatureDefinitionInput[]): FeatureSchem
       id,
       name: input.name,
       description: input.description,
-      parent: undefined, // Flat features have no parent
-      cascadeToChildren: input.cascadeToChildren ?? true,
       defaultEnabled: input.defaultEnabled ?? false,
       metadata: input.metadata,
     };
 
     features.set(id, definition);
-
-    // All features are roots in flat model
-    roots.push(id);
-  }
-
-  // No children map needed for flat features
-
-  // Convert children map to readonly
-  const children = new Map<FeatureId, readonly FeatureId[]>();
-  for (const [parentId, childIds] of childrenMap) {
-    children.set(parentId, Object.freeze([...childIds]));
+    allFeatures.push(id);
   }
 
   return {
     features,
-    roots: Object.freeze([...roots]),
-    children,
+    allFeatures: Object.freeze([...allFeatures]),
   };
 }
 
@@ -246,43 +212,8 @@ export function buildSchema(definitions: FeatureDefinitionInput[]): FeatureSchem
 export function createEmptySchema(): FeatureSchema {
   return {
     features: new Map(),
-    roots: [],
-    children: new Map(),
+    allFeatures: [],
   };
-}
-
-/**
- * Gets all child feature IDs for a given feature (direct children only).
- *
- * @param schema - The feature schema
- * @param id - The feature ID to get children for
- * @returns Array of child feature IDs
- */
-export function getChildFeatureIds(schema: FeatureSchema, id: FeatureId): readonly FeatureId[] {
-  return schema.children.get(id) ?? [];
-}
-
-/**
- * Gets all descendant feature IDs for a given feature (recursive).
- *
- * @param schema - The feature schema
- * @param id - The feature ID to get descendants for
- * @returns Array of all descendant feature IDs
- */
-export function getDescendantFeatureIds(schema: FeatureSchema, id: FeatureId): FeatureId[] {
-  const descendants: FeatureId[] = [];
-  const queue = [...(schema.children.get(id) ?? [])];
-
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    descendants.push(current);
-    const children = schema.children.get(current);
-    if (children) {
-      queue.push(...children);
-    }
-  }
-
-  return descendants;
 }
 
 /**
@@ -303,7 +234,6 @@ export function mergeSchemas(base: FeatureSchema, override: FeatureSchema): Feat
       id: def.id as string,
       name: def.name,
       description: def.description,
-      cascadeToChildren: def.cascadeToChildren,
       defaultEnabled: def.defaultEnabled,
       metadata: def.metadata,
     });
@@ -320,7 +250,6 @@ export function mergeSchemas(base: FeatureSchema, override: FeatureSchema): Feat
         id: idStr,
         name: def.name,
         description: def.description,
-        cascadeToChildren: def.cascadeToChildren,
         defaultEnabled: def.defaultEnabled,
         metadata: def.metadata,
       };
@@ -329,7 +258,6 @@ export function mergeSchemas(base: FeatureSchema, override: FeatureSchema): Feat
         id: idStr,
         name: def.name,
         description: def.description,
-        cascadeToChildren: def.cascadeToChildren,
         defaultEnabled: def.defaultEnabled,
         metadata: def.metadata,
       });

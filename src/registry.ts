@@ -9,16 +9,16 @@
 
 import { buildSchema, createEmptySchema } from "./schema.ts";
 import {
-    type FeatureConfig,
-    type FeatureDefinition,
-    type FeatureId,
-    type FeatureRegistry,
-    type FeatureSchema,
-    type FeatureState,
-    type FeatureStateReason,
-    type ResolvedConfig,
-    featureId,
-    FeatureNotFoundError,
+  type FeatureConfig,
+  type FeatureDefinition,
+  type FeatureId,
+  featureId,
+  FeatureNotFoundError,
+  type FeatureRegistry,
+  type FeatureSchema,
+  type FeatureState,
+  type FeatureStateReason,
+  type ResolvedConfig,
 } from "./types.ts";
 
 /**
@@ -48,27 +48,39 @@ export function createRegistry(options?: CreateRegistryOptions): FeatureRegistry
 
   // Initialize all features to their default states
   for (const [id, definition] of schema.features) {
-    states.set(id, computeInitialState(definition, config, schema));
+    states.set(id, computeInitialState(definition, config));
   }
 
-  // Apply explicit enables (with cascade)
+  // Apply explicit enables
   if (config.enabled) {
     for (const idStr of config.enabled) {
       try {
         const id = featureId(idStr);
-        applyEnable(id, states, schema, configSource, "explicit-enabled");
+        if (schema.features.has(id)) {
+          states.set(id, {
+            enabled: true,
+            reason: "explicit-enabled",
+            source: configSource,
+          });
+        }
       } catch {
         // Skip invalid feature IDs
       }
     }
   }
 
-  // Apply explicit disables (overrides enables, with cascade)
+  // Apply explicit disables (overrides enables)
   if (config.disabled) {
     for (const idStr of config.disabled) {
       try {
         const id = featureId(idStr);
-        applyDisable(id, states, schema, configSource, "explicit-disabled");
+        if (schema.features.has(id)) {
+          states.set(id, {
+            enabled: false,
+            reason: "explicit-disabled",
+            source: configSource,
+          });
+        }
       } catch {
         // Skip invalid feature IDs
       }
@@ -91,7 +103,6 @@ export function createRegistry(options?: CreateRegistryOptions): FeatureRegistry
 function computeInitialState(
   definition: FeatureDefinition,
   config: FeatureConfig,
-  _schema: FeatureSchema
 ): FeatureState {
   // Check enableAll/disableAll first
   if (config.enableAll) {
@@ -123,44 +134,6 @@ function computeInitialState(
 }
 
 /**
- * Applies an enable to a feature.
- * Features are flat - no cascading to children.
- */
-function applyEnable(
-  id: FeatureId,
-  states: Map<FeatureId, FeatureState>,
-  _schema: FeatureSchema,
-  source: ResolvedConfig["source"],
-  reason: FeatureStateReason
-): void {
-  // Set the feature state
-  states.set(id, {
-    enabled: true,
-    reason,
-    source,
-  });
-}
-
-/**
- * Applies a disable to a feature.
- * Features are flat - no cascading to children.
- */
-function applyDisable(
-  id: FeatureId,
-  states: Map<FeatureId, FeatureState>,
-  _schema: FeatureSchema,
-  source: ResolvedConfig["source"],
-  reason: FeatureStateReason
-): void {
-  // Set the feature state
-  states.set(id, {
-    enabled: false,
-    reason,
-    source,
-  });
-}
-
-/**
  * Gets a feature definition from the registry's schema.
  *
  * @param registry - The feature registry
@@ -169,7 +142,7 @@ function applyDisable(
  */
 export function getFeature(
   registry: FeatureRegistry,
-  id: FeatureId
+  id: FeatureId,
 ): FeatureDefinition | undefined {
   return registry.schema.features.get(id);
 }
@@ -183,7 +156,7 @@ export function getFeature(
  */
 export function getFeatureState(
   registry: FeatureRegistry,
-  id: FeatureId
+  id: FeatureId,
 ): FeatureState | undefined {
   return registry.states.get(id);
 }
@@ -216,7 +189,7 @@ export function isDisabled(registry: FeatureRegistry, id: FeatureId): boolean {
  *
  * @param registry - The feature registry
  * @param id - The feature ID to require
- * @throws FeatureNotEnabledError if the feature is not enabled
+ * @throws FeatureNotFoundError if the feature is not enabled
  */
 export function requireFeature(registry: FeatureRegistry, id: FeatureId): void {
   if (!isEnabled(registry, id)) {
@@ -236,17 +209,17 @@ export function requireFeature(registry: FeatureRegistry, id: FeatureId): void {
 export function setFeatureState(
   registry: FeatureRegistry,
   id: FeatureId,
-  enabled: boolean
+  enabled: boolean,
 ): FeatureRegistry {
   const newStates = new Map(registry.states);
 
   const reason: FeatureStateReason = enabled ? "explicit-enabled" : "explicit-disabled";
 
-  if (enabled) {
-    applyEnable(id, newStates, registry.schema, { type: "programmatic" }, reason);
-  } else {
-    applyDisable(id, newStates, registry.schema, { type: "programmatic" }, reason);
-  }
+  newStates.set(id, {
+    enabled,
+    reason,
+    source: { type: "programmatic" },
+  });
 
   return {
     schema: registry.schema,
@@ -365,7 +338,7 @@ export function createSimpleRegistry(featureIds: string[]): FeatureRegistry {
  */
 export function mergeRegistries(
   base: FeatureRegistry,
-  override: FeatureRegistry
+  override: FeatureRegistry,
 ): FeatureRegistry {
   // Merge schemas (override takes precedence for same IDs)
   const allFeatures = new Map<FeatureId, FeatureDefinition>();
@@ -381,7 +354,6 @@ export function mergeRegistries(
     id: def.id as string,
     name: def.name,
     description: def.description,
-    cascadeToChildren: def.cascadeToChildren,
     defaultEnabled: def.defaultEnabled,
     metadata: def.metadata,
   }));

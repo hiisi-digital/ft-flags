@@ -2,7 +2,7 @@
  * @module @hiisi/ft-flags
  *
  * Feature flags system for conditional compilation and runtime feature gating.
- * Follows Cargo-style feature conventions with hierarchical features,
+ * Follows Cargo-style feature conventions with flat features (kebab-case),
  * feature sets, and default features.
  *
  * @example
@@ -21,7 +21,7 @@
  * const resolved = resolveFeatures(manifest);
  *
  * // Check if a feature is enabled
- * if (isFeatureEnabled("shimp.fs", resolved)) {
+ * if (isFeatureEnabled("fs", resolved)) {
  *   // Use filesystem features
  * }
  * ```
@@ -30,23 +30,23 @@
  * ```ts
  * import { createRegistry, isEnabled, featureId, buildSchema } from "@hiisi/ft-flags";
  *
- * // Legacy API: Define features with schema
+ * // Define features with schema
  * const schema = buildSchema([
- *   { id: "shimp" },
- *   { id: "shimp.fs", description: "File system access" },
- *   { id: "shimp.env", description: "Environment variable access" },
+ *   { id: "fs", description: "File system access" },
+ *   { id: "env", description: "Environment variable access" },
+ *   { id: "async-runtime", description: "Async runtime support" },
  * ]);
  *
  * // Create registry with enabled features
  * const registry = createRegistry({
  *   schema,
  *   config: {
- *     enabled: ["shimp.fs", "shimp.env"],
+ *     enabled: ["fs", "env"],
  *   },
  * });
  *
  * // Check if features are enabled
- * if (isEnabled(featureId("shimp.fs"), registry)) {
+ * if (isEnabled(featureId("fs"), registry)) {
  *   // Use filesystem features
  * }
  * ```
@@ -57,37 +57,33 @@
 // =============================================================================
 
 export type {
-    ConfigSource,
-    FeatureCheckResult,
-    FeatureConfig,
-    FeatureDefinition,
-    FeatureDefinitionInput,
-    FeatureId,
-    FeatureMetadata,
-    FeatureRegistry,
-    FeatureSchema,
-    FeatureState,
-    FeatureStateReason,
-    ResolvedConfig
+  ConfigSource,
+  FeatureCheckResult,
+  FeatureConfig,
+  FeatureDefinition,
+  FeatureDefinitionInput,
+  FeatureId,
+  FeatureMetadata,
+  FeatureRegistry,
+  FeatureSchema,
+  FeatureState,
+  FeatureStateReason,
+  ResolvedConfig,
 } from "./src/types.ts";
 
 export {
-    ConfigLoadError,
-    FeatureFlagError,
-    featureId,
-    FeatureIdFormatError,
-    FeatureNotEnabledError,
-    FeatureNotFoundError,
-    FeatureSchemaError,
-    getAncestorFeatureIds,
-    getDepFeature,
-    getDepPackage,
-    getFeatureDepth,
-    isAncestorOf,
-    isDepFeatureRef,
-    isDescendantOf,
-    isValidFeatureId,
-    unsafeFeatureId
+  ConfigLoadError,
+  FeatureFlagError,
+  featureId,
+  FeatureIdFormatError,
+  FeatureNotEnabledError,
+  FeatureNotFoundError,
+  FeatureSchemaError,
+  getDepFeature,
+  getDepPackage,
+  isDepFeatureRef,
+  isValidFeatureId,
+  unsafeFeatureId,
 } from "./src/types.ts";
 
 // =============================================================================
@@ -95,123 +91,109 @@ export {
 // =============================================================================
 
 export type {
-    FeatureManifest,
-    FeatureManifestMetadata,
-    FeatureTreeNode,
-    ManifestSource,
-    ManifestValidation,
-    RawFtFlagsConfig,
-    ResolvedFeatures,
-    ResolveOptions
+  FeatureManifest,
+  FeatureManifestMetadata,
+  FeatureTreeNode,
+  ManifestSource,
+  ManifestValidation,
+  RawFtFlagsConfig,
+  ResolvedFeatures,
+  ResolveOptions,
 } from "./src/manifest.ts";
 
 export {
-    buildFeatureTree,
-    createEmptyManifest,
-    createSimpleManifest,
-    detectCycles,
-    getEnableChain,
-    isFeatureEnabled,
-    listAvailableFeatures,
-    listDisabledFeatures as listDisabledManifestFeatures,
-    listEnabledFeatures as listEnabledManifestFeatures,
-    loadManifest,
-    loadManifestFromDenoJson,
-    loadManifestFromPackageJson,
-    parseManifest,
-    renderFeatureTree,
-    resolveFeatures,
-    toFeatureIdSet,
-    toRawConfig,
-    validateManifest
+  buildFeatureTree,
+  createEmptyManifest,
+  createSimpleManifest,
+  detectCycles,
+  getEnableChain,
+  isFeatureEnabled,
+  listAvailableFeatures,
+  listDisabledFeatures as listManifestDisabledFeatures,
+  listEnabledFeatures as listManifestEnabledFeatures,
+  loadManifest,
+  loadManifestFromDenoJson,
+  loadManifestFromPackageJson,
+  parseManifest,
+  renderFeatureTree,
+  resolveFeatures,
+  toFeatureIdSet,
+  toRawConfig,
+  validateManifest,
 } from "./src/manifest.ts";
 
 // =============================================================================
-// Schema (Legacy API)
+// Schema
 // =============================================================================
 
 export {
-    buildSchema,
-    createEmptySchema,
-    detectCircularDependencies,
-    getChildFeatureIds,
-    getDescendantFeatureIds,
-    mergeSchemas,
-    mergeValidationResults,
-    validateFeatureDefinition,
-    validateFeatureId,
-    validateSchema
+  buildSchema,
+  createEmptySchema,
+  mergeSchemas,
+  mergeValidationResults,
+  validateFeatureDefinition,
+  validateFeatureId,
+  validateSchema,
 } from "./src/schema.ts";
 
 export type { ValidationResult } from "./src/schema.ts";
 
 // =============================================================================
-// Registry (Legacy API)
+// Registry
 // =============================================================================
 
 export {
-    cloneRegistry,
-    createRegistry,
-    createSimpleRegistry,
-    disableFeature,
-    enableFeature,
-    getFeature,
-    getFeatureState,
-    isDisabled,
-    isEnabled,
-    listDisabledFeatures,
-    listEnabledFeatures,
-    listFeatures,
-    mergeRegistries,
-    requireFeature,
-    setFeatureState
+  cloneRegistry,
+  createRegistry,
+  createSimpleRegistry,
+  disableFeature,
+  enableFeature,
+  getFeature,
+  getFeatureState,
+  isDisabled,
+  isEnabled,
+  listDisabledFeatures,
+  listEnabledFeatures,
+  listFeatures,
+  mergeRegistries,
+  requireFeature,
+  setFeatureState,
 } from "./src/registry.ts";
 
 export type { CreateRegistryOptions } from "./src/registry.ts";
 
 // =============================================================================
-// Evaluation (Legacy API)
+// Evaluation
 // =============================================================================
 
 export {
-    allEnabled,
-    anyEnabled,
-    checkFeature,
-    isDisabled as checkIsDisabled,
-    isEnabled as checkIsEnabled,
-    choose,
-    contractFeatures,
-    countEnabled,
-    requireFeature as evalRequireFeature,
-    expandFeatures,
-    filterDisabled,
-    filterEnabled,
-    noneEnabled,
-    whenDisabled,
-    whenEnabled
+  allEnabled,
+  anyEnabled,
+  checkFeature,
+  choose,
+  countEnabled,
+  filterDisabled,
+  filterEnabled,
+  noneEnabled,
+  requireFeature as evalRequireFeature,
+  whenDisabled,
+  whenEnabled,
 } from "./src/evaluate.ts";
 
 // =============================================================================
-// Configuration (Legacy API)
+// Configuration
 // =============================================================================
 
 export {
-    autoLoadConfig,
-    configFromDisabled,
-    configFromEnabled,
-    disableAllConfig,
-    emptyConfig,
-    enableAllConfig,
-    loadFromCli,
-    loadFromDenoJson,
-    loadFromEnv,
-    loadFromPackageJson,
-    mergeConfigs,
-    toFeatureConfig
+  configFromDisabled,
+  configFromEnabled,
+  disableAllConfig,
+  emptyConfig,
+  enableAllConfig,
+  loadEnvConfig,
+  loadFromCli,
+  loadFromEnv,
+  mergeConfigs,
 } from "./src/config.ts";
 
-export type {
-    FeatureDefinitionConfig,
-    FeatureFlagsConfig,
-    LoadConfigOptions
-} from "./src/config.ts";
+export type { LoadConfigOptions } from "./src/config.ts";

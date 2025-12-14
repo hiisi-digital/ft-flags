@@ -8,11 +8,11 @@
  */
 
 import {
-    type FeatureCheckResult,
-    type FeatureId,
-    type FeatureRegistry,
-    type FeatureState,
-    FeatureNotEnabledError,
+  type FeatureCheckResult,
+  type FeatureId,
+  FeatureNotEnabledError,
+  type FeatureRegistry,
+  type FeatureState,
 } from "./types.ts";
 
 /**
@@ -71,7 +71,7 @@ export function requireFeature(id: FeatureId, registry: FeatureRegistry): void {
  */
 export function checkFeature(
   id: FeatureId,
-  registry: FeatureRegistry
+  registry: FeatureRegistry,
 ): FeatureCheckResult {
   const state = registry.states.get(id);
 
@@ -92,38 +92,6 @@ export function checkFeature(
     featureId: id,
     state,
   };
-}
-
-/**
- * Expand a list of feature IDs.
- * With flat features, this just returns the input list (no hierarchy to expand).
- *
- * @param ids - The feature IDs to expand
- * @param _registry - The feature registry (unused, features are flat)
- * @returns The same feature IDs (no expansion needed)
- */
-export function expandFeatures(
-  ids: FeatureId[],
-  _registry: FeatureRegistry
-): FeatureId[] {
-  // Features are flat - no expansion needed
-  return [...ids];
-}
-
-/**
- * Contract a list of feature IDs.
- * With flat features, this just returns the input list (no hierarchy to contract).
- *
- * @param ids - The feature IDs to contract
- * @param _registry - The feature registry (unused, features are flat)
- * @returns The same feature IDs (no contraction needed)
- */
-export function contractFeatures(
-  ids: FeatureId[],
-  _registry: FeatureRegistry
-): FeatureId[] {
-  // Features are flat - no contraction needed
-  return [...ids];
 }
 
 /**
@@ -178,7 +146,7 @@ export function noneEnabled(ids: FeatureId[], registry: FeatureRegistry): boolea
  */
 export function filterEnabled(
   ids: FeatureId[],
-  registry: FeatureRegistry
+  registry: FeatureRegistry,
 ): FeatureId[] {
   return ids.filter((id) => isEnabled(id, registry));
 }
@@ -192,7 +160,7 @@ export function filterEnabled(
  */
 export function filterDisabled(
   ids: FeatureId[],
-  registry: FeatureRegistry
+  registry: FeatureRegistry,
 ): FeatureId[] {
   return ids.filter((id) => !isEnabled(id, registry));
 }
@@ -225,7 +193,7 @@ export function countEnabled(ids: FeatureId[], registry: FeatureRegistry): numbe
 export function whenEnabled<T>(
   id: FeatureId,
   registry: FeatureRegistry,
-  fn: () => T
+  fn: () => T,
 ): T | undefined {
   if (isEnabled(id, registry)) {
     return fn();
@@ -244,7 +212,7 @@ export function whenEnabled<T>(
 export function whenDisabled<T>(
   id: FeatureId,
   registry: FeatureRegistry,
-  fn: () => T
+  fn: () => T,
 ): T | undefined {
   if (!isEnabled(id, registry)) {
     return fn();
@@ -265,7 +233,7 @@ export function choose<T>(
   id: FeatureId,
   registry: FeatureRegistry,
   enabledValue: T,
-  disabledValue: T
+  disabledValue: T,
 ): T {
   return isEnabled(id, registry) ? enabledValue : disabledValue;
 }

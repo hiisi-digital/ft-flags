@@ -2,27 +2,7 @@
   "name": "@hiisi/ft-flags",
   "version": "0.1.0",
   "license": "MPL-2.0",
-  "features": {
-    "default": ["std"],
-    "std": ["fs", "env"],
-    "full": ["std", "experimental"],
-    "fs": [],
-    "env": [],
-    "args": [],
-    "experimental": ["async-runtime"],
-    "async-runtime": []
-  },
-  "metadata": {
-    "features": {
-      "std": {
-        "description": "Standard library features for cross-runtime compatibility"
-      },
-      "experimental": {
-        "description": "Experimental features that may change between versions",
-        "unstable": true
-      }
-    }
-  },
+
   "exports": {
     ".": "./mod.ts",
     "./cli": "./src/cli.ts",

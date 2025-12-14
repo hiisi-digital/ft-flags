@@ -11,18 +11,20 @@
  */
 
 import {
-    buildFeatureTree,
-    getEnableChain,
-    isFeatureEnabled,
-    listAvailableFeatures,
-    listDisabledFeatures,
-    listEnabledFeatures,
-    loadManifest,
-    renderFeatureTree,
-    resolveFeatures,
-    validateManifest,
-    type FeatureManifest,
-    type ResolveOptions
+  buildFeatureTree,
+  type FeatureManifest,
+  getEnableChain,
+  isFeatureEnabled,
+  listAvailableFeatures,
+  listDisabledFeatures,
+  listEnabledFeatures,
+  loadManifest,
+  loadManifestFromDenoJson,
+  loadManifestFromPackageJson,
+  renderFeatureTree,
+  resolveFeatures,
+  type ResolveOptions,
+  validateManifest,
 } from "./manifest.ts";
 
 // =============================================================================
@@ -44,13 +46,42 @@ function parseArgs(args: string[]): ParsedArgs {
 
   let i = 0;
 
-  // First non-flag argument is the command
+  // Parse flags that come before the command (like --package)
   while (i < args.length) {
     const arg = args[i];
     if (!arg.startsWith("-")) {
+      // First non-flag argument is the command
       result.command = arg;
       i++;
       break;
+    }
+
+    // Handle flags before command
+    if (arg.startsWith("--")) {
+      const eqIndex = arg.indexOf("=");
+      if (eqIndex !== -1) {
+        const key = arg.slice(2, eqIndex);
+        const value = arg.slice(eqIndex + 1);
+        result.flags[key] = value;
+      } else {
+        const key = arg.slice(2);
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith("-")) {
+          result.flags[key] = nextArg;
+          i++;
+        } else {
+          result.flags[key] = true;
+        }
+      }
+    } else if (arg.startsWith("-")) {
+      const key = arg.slice(1);
+      const nextArg = args[i + 1];
+      if (nextArg && !nextArg.startsWith("-")) {
+        result.flags[key] = nextArg;
+        i++;
+      } else {
+        result.flags[key] = true;
+      }
     }
     i++;
   }
@@ -157,7 +188,7 @@ function warning(text: string): string {
 
 function cmdList(
   manifest: FeatureManifest,
-  flags: Record<string, string | boolean>
+  flags: Record<string, string | boolean>,
 ): number {
   const showEnabled = flags.enabled === true;
   const showAvailable = flags.available === true || !showEnabled;
@@ -220,7 +251,7 @@ function cmdList(
 function cmdCheck(
   manifest: FeatureManifest,
   featureName: string,
-  flags: Record<string, string | boolean>
+  flags: Record<string, string | boolean>,
 ): number {
   const options = getResolveOptions(flags);
   const resolved = resolveFeatures(manifest, options);
@@ -229,10 +260,10 @@ function cmdCheck(
 
   if (enabled) {
     const chain = getEnableChain(featureName, resolved);
-    const chainStr = chain && chain.length > 1
-      ? `(via: ${chain.join(" -> ")})`
-      : "(explicit)";
-    console.log(success(`${colorize(featureName, "bold")} is enabled ${colorize(chainStr, "dim")}`));
+    const chainStr = chain && chain.length > 1 ? `(via: ${chain.join(" -> ")})` : "(explicit)";
+    console.log(
+      success(`${colorize(featureName, "bold")} is enabled ${colorize(chainStr, "dim")}`),
+    );
     return 0;
   } else {
     if (!manifest.features.has(featureName)) {
@@ -246,7 +277,7 @@ function cmdCheck(
 
 function cmdResolve(
   manifest: FeatureManifest,
-  flags: Record<string, string | boolean>
+  flags: Record<string, string | boolean>,
 ): number {
   const options = getResolveOptions(flags);
   const resolved = resolveFeatures(manifest, options);
@@ -274,7 +305,7 @@ function cmdResolve(
 
 function cmdTree(
   manifest: FeatureManifest,
-  rootFeature: string | undefined
+  rootFeature: string | undefined,
 ): number {
   const nodes = buildFeatureTree(manifest, rootFeature);
 
@@ -374,18 +405,15 @@ ${colorize("ENVIRONMENT:", "bold")}
 export async function main(args: string[]): Promise<number> {
   const parsed = parseArgs(args);
 
-  // Apply environment variable overrides
-  // Support both FT_ and FT_FLAGS_ prefixes for compatibility
-  const envFeatures = Deno.env.get("FT_FEATURES") ?? Deno.env.get("FT_FLAGS_FEATURES");
+  // Apply environment variable overrides (FT_ prefix)
+  const envFeatures = Deno.env.get("FT_FEATURES");
   if (envFeatures && !parsed.flags.features) {
     parsed.flags.features = envFeatures;
   }
-  if (Deno.env.get("FT_NO_DEFAULT_FEATURES") === "true" || 
-      Deno.env.get("FT_FLAGS_NO_DEFAULT_FEATURES") === "true") {
+  if (Deno.env.get("FT_NO_DEFAULT_FEATURES") === "true") {
     parsed.flags["no-default-features"] = true;
   }
-  if (Deno.env.get("FT_ALL_FEATURES") === "true" ||
-      Deno.env.get("FT_FLAGS_ALL_FEATURES") === "true") {
+  if (Deno.env.get("FT_ALL_FEATURES") === "true") {
     parsed.flags["all-features"] = true;
   }
 
@@ -405,7 +433,6 @@ export async function main(args: string[]): Promise<number> {
     const pkgPath = `${packagePath}/package.json`;
 
     try {
-      const { loadManifestFromDenoJson, loadManifestFromPackageJson } = await import("./manifest.ts");
       manifest = await loadManifestFromDenoJson(denoPath);
       if (!manifest) {
         manifest = await loadManifestFromPackageJson(pkgPath);

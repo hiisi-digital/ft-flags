@@ -8,23 +8,23 @@ import { assertEquals, assertExists } from "@std/assert";
 import { describe, it } from "@std/testing/bdd";
 
 import {
-    buildFeatureTree,
-    createEmptyManifest,
-    createSimpleManifest,
-    detectCycles,
-    getEnableChain,
-    isFeatureEnabled,
-    listAvailableFeatures,
-    listDisabledFeatures,
-    listEnabledFeatures,
-    parseManifest,
-    renderFeatureTree,
-    resolveFeatures,
-    toFeatureIdSet,
-    toRawConfig,
-    validateManifest,
-    type FeatureManifest,
-    type RawFtFlagsConfig,
+  buildFeatureTree,
+  createEmptyManifest,
+  createSimpleManifest,
+  detectCycles,
+  type FeatureManifest,
+  getEnableChain,
+  isFeatureEnabled,
+  listAvailableFeatures,
+  listDisabledFeatures,
+  listEnabledFeatures,
+  parseManifest,
+  type RawFtFlagsConfig,
+  renderFeatureTree,
+  resolveFeatures,
+  toFeatureIdSet,
+  toRawConfig,
+  validateManifest,
 } from "../src/manifest.ts";
 
 // =============================================================================
@@ -534,9 +534,9 @@ describe("buildFeatureTree", () => {
 
     const result = validateManifest(manifest);
     // Should not error on dep refs or dep: prefixes
-    assertEquals(result.errors.filter(e => e.includes("serde/derive")).length, 0);
-    assertEquals(result.errors.filter(e => e.includes("tokio/full")).length, 0);
-    assertEquals(result.errors.filter(e => e.includes("dep:async-hooks")).length, 0);
+    assertEquals(result.errors.filter((e) => e.includes("serde/derive")).length, 0);
+    assertEquals(result.errors.filter((e) => e.includes("tokio/full")).length, 0);
+    assertEquals(result.errors.filter((e) => e.includes("dep:async-hooks")).length, 0);
   });
 
   it("should return empty for unknown root", () => {
@@ -652,7 +652,7 @@ describe("edge cases", () => {
     // Should not error on dep: references
     assertEquals(
       result.errors.some((e) => e.includes("dep:async-hooks")),
-      false
+      false,
     );
   });
 

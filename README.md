@@ -88,12 +88,12 @@ Each feature maps to an array of features it **activates**. When you enable a fe
 {
   "features": {
     "full": ["std", "experimental", "async-runtime"],
-    "std": ["shimp.fs", "shimp.env"]
+    "std": ["fs", "env"]
   }
 }
 ```
 
-Enabling `full` will enable: `full`, `std`, `experimental`, `async-runtime`, `shimp.fs`, `shimp.env`.
+Enabling `full` will enable: `full`, `std`, `experimental`, `async-runtime`, `fs`, `env`.
 
 #### Dependency Features
 
@@ -121,7 +121,7 @@ Similar to Cargo's `dep:` syntax, you can reference optional package dependencie
 }
 ```
 
-*Note: `dep:` integration with package managers is planned for a future release.*
+_Note: `dep:` integration with package managers is planned for a future release._
 
 ### Feature Metadata
 
@@ -185,13 +185,13 @@ Override features at runtime via environment variables:
 
 ```bash
 # Enable specific features
-FT_FLAGS_FEATURES=experimental,async-runtime
+FT_FEATURES=experimental,async-runtime
 
 # Disable default features
-FT_FLAGS_NO_DEFAULT_FEATURES=true
+FT_NO_DEFAULT_FEATURES=true
 
 # Enable all features
-FT_FLAGS_ALL_FEATURES=true
+FT_ALL_FEATURES=true
 ```
 
 ### CLI Arguments
@@ -335,10 +335,10 @@ $ ft check fs --package ./packages/my-lib
 
 ```typescript
 import {
-  loadManifest,
-  resolveFeatures,
   isFeatureEnabled,
   listAvailableFeatures,
+  loadManifest,
+  resolveFeatures,
 } from "@hiisi/ft-flags";
 
 // Load features from deno.json or package.json
@@ -354,7 +354,7 @@ if (isFeatureEnabled("fs", resolved)) {
 
 // List all available features
 const available = listAvailableFeatures(manifest);
-console.log(available); // ["default", "std", "shimp.fs", ...]
+console.log(available); // ["default", "std", "fs", ...]
 ```
 
 ### Custom Feature Selection
@@ -364,7 +364,7 @@ import { resolveFeatures } from "@hiisi/ft-flags";
 
 // Enable specific features, no defaults
 const resolved = resolveFeatures(manifest, {
-  features: ["experimental", "shimp.fs"],
+  features: ["experimental", "fs"],
   noDefaultFeatures: true,
 });
 
@@ -374,25 +374,28 @@ const all = resolveFeatures(manifest, {
 });
 ```
 
-### Building a Registry
+### Using the Registry API
 
 ```typescript
-import {
-  loadManifest,
-  buildRegistry,
-  isEnabled,
-  featureId,
-} from "@hiisi/ft-flags";
+import { buildSchema, createRegistry, featureId, isEnabled } from "@hiisi/ft-flags";
 
-const manifest = await loadManifest();
+// Define features with schema
+const schema = buildSchema([
+  { id: "fs", description: "File system access" },
+  { id: "env", description: "Environment variable access" },
+  { id: "async-runtime", description: "Async runtime support" },
+]);
 
-const registry = buildRegistry(manifest, {
-  features: ["std"],
-  noDefaultFeatures: false,
+// Create registry with enabled features
+const registry = createRegistry({
+  schema,
+  config: {
+    enabled: ["fs", "env"],
+  },
 });
 
 // Type-safe feature checks
-if (isEnabled(featureId("fs"), registry)) {
+if (isEnabled(registry, featureId("fs"))) {
   // ...
 }
 ```
@@ -440,16 +443,6 @@ Add to your `settings.json`:
 https://jsr.io/@hiisi/ft-flags/schema.json
 ```
 
-### Generating Types from Schema
-
-```typescript
-import { generateTypesFromSchema } from "@hiisi/ft-flags/codegen";
-
-// Generate TypeScript types from your manifest
-const types = await generateTypesFromSchema("./deno.json");
-// Outputs: type MyFeatures = "default" | "std" | "shimp.fs" | ...
-```
-
 ## Integration with cfg-ts
 
 `ft-flags` is designed to work with `@hiisi/cfg-ts` for conditional compilation:
@@ -475,16 +468,16 @@ export function modernStdLib(): void {
 
 ## Comparison with Cargo
 
-| Cargo | ft-flags | Notes |
-|-------|----------|-------|
-| `[features]` | `"features": {}` | Same concept |
-| `default = ["std"]` | `"default": ["std"]` | Same semantics |
-| `foo = ["bar", "baz"]` | `"foo": ["bar", "baz"]` | Feature enables others |
-| `dep:optional-dep` | `"dep:pkg-name"` | Optional dependency |
-| `serde/derive` | `"serde/derive"` | Dep feature reference |
-| `--features foo` | `--features foo` | CLI flag |
-| `--no-default-features` | `--no-default-features` | Disable defaults |
-| `--all-features` | `--all-features` | Enable everything |
+| Cargo                   | ft-flags                | Notes                  |
+| ----------------------- | ----------------------- | ---------------------- |
+| `[features]`            | `"features": {}`        | Same concept           |
+| `default = ["std"]`     | `"default": ["std"]`    | Same semantics         |
+| `foo = ["bar", "baz"]`  | `"foo": ["bar", "baz"]` | Feature enables others |
+| `dep:optional-dep`      | `"dep:pkg-name"`        | Optional dependency    |
+| `serde/derive`          | `"serde/derive"`        | Dep feature reference  |
+| `--features foo`        | `--features foo`        | CLI flag               |
+| `--no-default-features` | `--no-default-features` | Disable defaults       |
+| `--all-features`        | `--all-features`        | Enable everything      |
 
 ## Related Packages
 

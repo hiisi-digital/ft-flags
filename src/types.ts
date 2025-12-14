@@ -8,8 +8,8 @@
 // =============================================================================
 
 /**
- * A feature identifier string, using dot-notation for hierarchy.
- * @example "shimp.fs", "shimp.env", "experimental.async"
+ * A feature identifier string using kebab-case.
+ * @example "async-runtime", "serde-support", "fs"
  */
 export type FeatureId = string & { readonly __brand: unique symbol };
 
@@ -59,7 +59,7 @@ export function featureId(id: string): FeatureId {
   if (!isValidFeatureId(id)) {
     throw new FeatureIdFormatError(
       id,
-      "Feature ID must be kebab-case (lowercase alphanumeric with hyphens, e.g., 'async-runtime')"
+      "Feature ID must be kebab-case (lowercase alphanumeric with hyphens, e.g., 'async-runtime')",
     );
   }
   return id as FeatureId;
@@ -130,57 +130,6 @@ export function isDepFeatureRef(id: string): boolean {
   return id.includes("/");
 }
 
-/**
- * @deprecated Features are now flat (kebab-case). This function is kept for legacy compatibility.
- * Gets all ancestor feature IDs from a hierarchical feature ID.
- * Returns an empty array since features are now flat.
- *
- * @param _id - The feature ID (unused, features are flat)
- * @returns Empty array (features are flat, no hierarchy)
- */
-export function getAncestorFeatureIds(_id: FeatureId): FeatureId[] {
-  // Features are now flat - no hierarchy
-  return [];
-}
-
-/**
- * @deprecated Features are now flat (kebab-case). This function always returns 0.
- * Gets the depth/level of a feature ID in the hierarchy.
- *
- * @param _id - The feature ID (unused, features are flat)
- * @returns Always 0 (features are flat, no hierarchy)
- */
-export function getFeatureDepth(_id: FeatureId): number {
-  // Features are now flat - no hierarchy
-  return 0;
-}
-
-/**
- * @deprecated Features are now flat (kebab-case). This function always returns false.
- * Checks if one feature ID is an ancestor of another.
- *
- * @param _ancestor - The potential ancestor feature ID (unused)
- * @param _descendant - The potential descendant feature ID (unused)
- * @returns Always false (features are flat, no hierarchy)
- */
-export function isAncestorOf(_ancestor: FeatureId, _descendant: FeatureId): boolean {
-  // Features are now flat - no hierarchy
-  return false;
-}
-
-/**
- * @deprecated Features are now flat (kebab-case). This function always returns false.
- * Checks if one feature ID is a descendant of another.
- *
- * @param _descendant - The potential descendant feature ID (unused)
- * @param _ancestor - The potential ancestor feature ID (unused)
- * @returns Always false (features are flat, no hierarchy)
- */
-export function isDescendantOf(_descendant: FeatureId, _ancestor: FeatureId): boolean {
-  // Features are now flat - no hierarchy
-  return false;
-}
-
 // =============================================================================
 // Feature Schema
 // =============================================================================
@@ -213,10 +162,6 @@ export interface FeatureDefinition {
   readonly name?: string;
   /** Human-readable description of the feature */
   readonly description?: string;
-  /** Parent feature ID (for hierarchical features) - computed from id if not specified */
-  readonly parent?: FeatureId;
-  /** Whether enabling parent automatically enables children */
-  readonly cascadeToChildren?: boolean;
   /** Whether this feature is enabled by default */
   readonly defaultEnabled?: boolean;
   /** Feature metadata */
@@ -224,7 +169,7 @@ export interface FeatureDefinition {
 }
 
 /**
- * Input for defining a feature (before parent is computed).
+ * Input for defining a feature.
  */
 export interface FeatureDefinitionInput {
   /** Unique identifier for this feature */
@@ -233,8 +178,6 @@ export interface FeatureDefinitionInput {
   readonly name?: string;
   /** Human-readable description of the feature */
   readonly description?: string;
-  /** Whether enabling parent automatically enables children (default: true) */
-  readonly cascadeToChildren?: boolean;
   /** Whether this feature is enabled by default */
   readonly defaultEnabled?: boolean;
   /** Feature metadata */
@@ -247,10 +190,8 @@ export interface FeatureDefinitionInput {
 export interface FeatureSchema {
   /** All feature definitions, keyed by feature ID */
   readonly features: ReadonlyMap<FeatureId, FeatureDefinition>;
-  /** Root features (those without parents) */
-  readonly roots: readonly FeatureId[];
-  /** Map of parent to children */
-  readonly children: ReadonlyMap<FeatureId, readonly FeatureId[]>;
+  /** All feature IDs (features are flat, no hierarchy) */
+  readonly allFeatures: readonly FeatureId[];
 }
 
 // =============================================================================
@@ -311,8 +252,6 @@ export interface FeatureState {
 export type FeatureStateReason =
   | "explicit-enabled" // Explicitly enabled in config
   | "explicit-disabled" // Explicitly disabled in config
-  | "parent-enabled" // Enabled because parent was enabled with cascade
-  | "parent-disabled" // Disabled because parent was disabled
   | "default-enabled" // Enabled by default in schema
   | "default-disabled" // Disabled by default (no explicit enable)
   | "enable-all" // Enabled because enableAll was set

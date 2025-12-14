@@ -11,7 +11,15 @@
  * - `dep:` prefix enables optional dependencies: `dep:tokio`
  */
 
-import { ConfigLoadError, featureId, type FeatureId, getDepFeature, getDepPackage, isDepFeatureRef, isValidFeatureId } from "./types.ts";
+import {
+  ConfigLoadError,
+  type FeatureId,
+  featureId,
+  getDepFeature,
+  getDepPackage,
+  isDepFeatureRef,
+  isValidFeatureId,
+} from "./types.ts";
 
 // =============================================================================
 // Manifest Types
@@ -151,7 +159,7 @@ export interface ManifestValidation {
  * @throws ConfigLoadError if the file cannot be read or parsed
  */
 export async function loadManifestFromDenoJson(
-  path?: string
+  path?: string,
 ): Promise<FeatureManifest | null> {
   const configPath = path ?? "./deno.json";
 
@@ -168,7 +176,9 @@ export async function loadManifestFromDenoJson(
 
     // Metadata follows the convention: metadata.features.{feature-name}
     const metadata = json.metadata as Record<string, unknown> | undefined;
-    const featureMetadata = metadata?.features as Record<string, FeatureManifestMetadata> | undefined;
+    const featureMetadata = metadata?.features as
+      | Record<string, FeatureManifestMetadata>
+      | undefined;
 
     const rawConfig: RawFtFlagsConfig = {
       features,
@@ -185,7 +195,7 @@ export async function loadManifestFromDenoJson(
     }
     throw new ConfigLoadError(
       `Failed to load deno.json: ${error instanceof Error ? error.message : String(error)}`,
-      configPath
+      configPath,
     );
   }
 }
@@ -215,7 +225,7 @@ export async function loadManifestFromDenoJson(
  * @throws ConfigLoadError if the file cannot be read or parsed
  */
 export async function loadManifestFromPackageJson(
-  path?: string
+  path?: string,
 ): Promise<FeatureManifest | null> {
   const configPath = path ?? "./package.json";
 
@@ -232,7 +242,9 @@ export async function loadManifestFromPackageJson(
 
     // Metadata follows the convention: metadata.features.{feature-name}
     const metadata = json.metadata as Record<string, unknown> | undefined;
-    const featureMetadata = metadata?.features as Record<string, FeatureManifestMetadata> | undefined;
+    const featureMetadata = metadata?.features as
+      | Record<string, FeatureManifestMetadata>
+      | undefined;
 
     const rawConfig: RawFtFlagsConfig = {
       features,
@@ -249,7 +261,7 @@ export async function loadManifestFromPackageJson(
     }
     throw new ConfigLoadError(
       `Failed to load package.json: ${error instanceof Error ? error.message : String(error)}`,
-      configPath
+      configPath,
     );
   }
 }
@@ -285,7 +297,7 @@ export async function loadManifest(): Promise<FeatureManifest | null> {
  */
 export function parseManifest(
   config: RawFtFlagsConfig,
-  source?: ManifestSource
+  source?: ManifestSource,
 ): FeatureManifest {
   const features = new Map<string, readonly string[]>();
   const metadata = new Map<string, FeatureManifestMetadata>();
@@ -328,7 +340,7 @@ export function createEmptyManifest(): FeatureManifest {
  */
 export function createSimpleManifest(
   featureNames: string[],
-  defaultFeatures?: string[]
+  defaultFeatures?: string[],
 ): FeatureManifest {
   const features = new Map<string, readonly string[]>();
 
@@ -361,7 +373,7 @@ export function createSimpleManifest(
  */
 export function resolveFeatures(
   manifest: FeatureManifest,
-  options: ResolveOptions = {}
+  options: ResolveOptions = {},
 ): ResolvedFeatures {
   const enabled = new Set<string>();
   const enabledBy = new Map<string, string[]>();
@@ -431,7 +443,7 @@ export function resolveFeatures(
  */
 export function isFeatureEnabled(
   feature: string,
-  resolved: ResolvedFeatures
+  resolved: ResolvedFeatures,
 ): boolean {
   return resolved.enabled.has(feature);
 }
@@ -445,7 +457,7 @@ export function isFeatureEnabled(
  */
 export function getEnableChain(
   feature: string,
-  resolved: ResolvedFeatures
+  resolved: ResolvedFeatures,
 ): string[] | null {
   if (!resolved.enabled.has(feature)) {
     return null;
@@ -530,7 +542,7 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
     // Validate feature name format
     if (!isValidFeatureIdOrDefault(name)) {
       errors.push(
-        `Invalid feature name "${name}": must be kebab-case (e.g., 'async-runtime')`
+        `Invalid feature name "${name}": must be kebab-case (e.g., 'async-runtime')`,
       );
     }
 
@@ -549,7 +561,7 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
 
       if (!allFeatures.has(dep)) {
         errors.push(
-          `Feature "${name}" references unknown feature "${dep}"`
+          `Feature "${name}" references unknown feature "${dep}"`,
         );
       }
     }
@@ -570,7 +582,7 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
   for (const name of manifest.metadata.keys()) {
     if (!allFeatures.has(name)) {
       warnings.push(
-        `Metadata defined for unknown feature "${name}"`
+        `Metadata defined for unknown feature "${name}"`,
       );
     }
   }
@@ -579,7 +591,7 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
   for (const [name, meta] of manifest.metadata) {
     if (meta.deprecated && !meta.deprecatedMessage) {
       warnings.push(
-        `Feature "${name}" is marked deprecated but has no deprecation message`
+        `Feature "${name}" is marked deprecated but has no deprecation message`,
       );
     }
   }
@@ -587,7 +599,7 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
   // Warn if no default feature
   if (!manifest.features.has("default")) {
     warnings.push(
-      'No "default" feature defined. Consider adding one for conventional usage.'
+      'No "default" feature defined. Consider adding one for conventional usage.',
     );
   }
 
@@ -609,13 +621,13 @@ function isValidFeatureIdOrDefault(name: string): boolean {
   if (name === "default") {
     return true;
   }
-  
+
   // dep: prefix for optional dependencies
   if (name.startsWith("dep:")) {
     const depName = name.slice(4);
     return depName.length > 0 && isValidPackageName(depName);
   }
-  
+
   // Dependency feature reference: pkg/feature or @scope/pkg/feature
   if (isDepFeatureRef(name)) {
     const pkg = getDepPackage(name);
@@ -623,7 +635,7 @@ function isValidFeatureIdOrDefault(name: string): boolean {
     if (!pkg || !feature) return false;
     return isValidPackageName(pkg) && isValidFeatureId(feature);
   }
-  
+
   return isValidFeatureId(name);
 }
 
@@ -635,7 +647,7 @@ function isValidPackageName(name: string): boolean {
   if (name.startsWith("@")) {
     const parts = name.slice(1).split("/");
     if (parts.length !== 2) return false;
-    return parts.every(p => /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(p));
+    return parts.every((p) => /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(p));
   }
   // Regular package name
   return /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(name);
@@ -709,7 +721,7 @@ export interface FeatureTreeNode {
  */
 export function buildFeatureTree(
   manifest: FeatureManifest,
-  root?: string
+  root?: string,
 ): FeatureTreeNode[] {
   const buildNode = (name: string, visited: Set<string>): FeatureTreeNode => {
     if (visited.has(name)) {
@@ -773,7 +785,7 @@ export function buildFeatureTree(
  */
 export function renderFeatureTree(
   nodes: readonly FeatureTreeNode[],
-  indent: string = ""
+  indent: string = "",
 ): string {
   const lines: string[] = [];
 
