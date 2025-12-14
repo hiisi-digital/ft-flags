@@ -39,6 +39,13 @@ interface PlatformConfig {
   sections: Record<string, string>;
 }
 
+// Unicode escape sequences for emojis (to satisfy prefer-ascii lint rule)
+const EMOJI = {
+  CHECK: "\u2705",
+  WARNING: "\u26A0\uFE0F",
+  CROSS: "\u274C",
+};
+
 const DENO_CONFIG: PlatformConfig = {
   name: "Deno",
   registry: "JSR",
@@ -58,7 +65,7 @@ This is the Deno-optimized package. The following versions are tested in CI:
 
 | 1.x | 2.x |
 |:---:|:---:|
-| ⚠️ | ✅ |
+| ${EMOJI.WARNING} | ${EMOJI.CHECK} |
 
 _1.x is best-effort due to lockfile version incompatibility_
 
@@ -165,13 +172,13 @@ This is the Node.js/Bun optimized package. The following runtimes and versions a
 
 | 18 | 20 | 22 |
 |:--:|:--:|:--:|
-| ✅ | ✅ | ✅ |
+| ${EMOJI.CHECK} | ${EMOJI.CHECK} | ${EMOJI.CHECK} |
 
 #### Bun
 
 | 1.0 | latest |
 |:---:|:------:|
-| ⚠️ | ✅ |
+| ${EMOJI.WARNING} | ${EMOJI.CHECK} |
 
 _Bun support is best-effort_
 
