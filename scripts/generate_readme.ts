@@ -360,5 +360,4 @@ if (import.meta.main) {
   await main();
 }
 
-export { generateReadme, PLATFORMS, type PlatformConfig };
-
+export { generateReadme, type PlatformConfig, PLATFORMS };
