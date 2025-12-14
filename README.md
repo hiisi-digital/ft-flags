@@ -30,7 +30,6 @@ This package serves as the foundation for conditional compilation in the `@hiisi
 <!-- PLATFORM_NOTICE:END -->
 
 <!-- SUPPORTED_VERSIONS:START -->
-
 ### Supported Runtimes
 
 The following runtimes and versions are tested in CI. The package may work on other versions, but only these are officially verified:
@@ -38,22 +37,22 @@ The following runtimes and versions are tested in CI. The package may work on ot
 #### Deno
 
 | 1.x | 2.x |
-| :-: | :-: |
-| ⚠️  | ✅  |
+|:---:|:---:|
+| ⚠️ | ✅ |
 
 _1.x is best-effort due to lockfile version incompatibility_
 
 #### Node.js
 
-| 18  | 20  | 22  |
-| :-: | :-: | :-: |
-| ✅  | ✅  | ✅  |
+| 18 | 20 | 22 |
+|:--:|:--:|:--:|
+| ✅ | ✅ | ✅ |
 
 #### Bun
 
 | 1.0 | latest |
-| :-: | :----: |
-| ⚠️  |   ✅   |
+|:---:|:------:|
+| ✅ | ✅ |
 
 _Bun support is best-effort_
 
