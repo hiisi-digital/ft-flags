@@ -242,11 +242,13 @@ jobs:
 
           ### Tested Runtimes
 
-          | Runtime | Versions | Status |
-          |---------|----------|--------|
-          | Deno | 1.x, 2.x | ✓ Supported |
-          | Node.js | 18 LTS, 20 LTS, 22 | ✓ Supported |
-          | Bun | 1.0, latest | ${{ steps.bun-status.outputs.badge }} |
+          | Runtime | 1.x | 2.x | 18 | 20 | 22 | 1.0 | latest |
+          |---------|:---:|:---:|:--:|:--:|:--:|:---:|:------:|
+          | Deno    | ⚠️  | ✅  | —  | —  | —  | —   | —      |
+          | Node.js | —   | —   | ✅ | ✅ | ✅ | —   | —      |
+          | Bun     | —   | —   | —  | —  | —  | ${{ needs.test-bun-package.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun-package.result == 'success' && '✅' || '⚠️' }} |
+
+          _Legend: ✅ = Passed, ⚠️ = Best-effort (may fail), ❌ = Failed, — = N/A_
 
           ### Release Artifacts
 

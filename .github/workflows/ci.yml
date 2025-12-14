@@ -268,11 +268,13 @@ jobs:
         run: |
           echo "## Runtime Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Runtime | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Deno | ${{ needs.test-deno.result == 'success' && '✓ Passed' || '✗ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Node.js | ${{ needs.test-node.result == 'success' && '✓ Passed' || '✗ Failed' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Bun | ${{ needs.test-bun.result == 'success' && '✓ Passed' || '⚠ Failed (best-effort)' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Runtime | 1.x | 2.x | 18 | 20 | 22 | 1.0 | latest |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|:---:|:---:|:--:|:--:|:--:|:---:|:------:|" >> $GITHUB_STEP_SUMMARY
+          echo "| Deno    | ⚠️  | ${{ needs.test-deno.result == 'success' && '✅' || '❌' }} | —  | —  | —  | —   | —      |" >> $GITHUB_STEP_SUMMARY
+          echo "| Node.js | —   | —   | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | —   | —      |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bun     | —   | —   | —  | —  | —  | ${{ needs.test-bun.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun.result == 'success' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Legend: ✅ = Passed, ⚠️ = Best-effort (may fail), ❌ = Failed, — = N/A_" >> $GITHUB_STEP_SUMMARY
 
   # =============================================================================
   # Publish Dry Run
