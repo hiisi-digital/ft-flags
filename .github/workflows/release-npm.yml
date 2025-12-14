@@ -245,7 +245,7 @@ jobs:
     if: needs.verify-tests.result == 'success'
     permissions:
       contents: read
-      id-token: write
+      id-token: write # Required for npm provenance (OIDC)
 
     steps:
       - name: Checkout
@@ -262,7 +262,13 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Publish to npm with provenance
+        working-directory: ./npm
+        # Using npm's trusted publishing (OIDC) - no token needed
+        # Requires id-token: write permission and trusted publisher configured on npm
         run: |
-          cd npm
+          npm config set registry https://registry.npmjs.org/
           npm publish --access public --provenance
