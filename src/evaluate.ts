@@ -1,53 +1,30 @@
 /**
  * Feature evaluation functions
  *
- * Provides functions to check if features are enabled and to
- * expand feature hierarchies.
+ * Provides functions to check if features are enabled.
+ * Features are flat (no hierarchy) - use the manifest system for Cargo-style feature dependencies.
  *
  * @module
  */
 
-import { getDescendantFeatureIds } from "./schema.ts";
 import {
     type FeatureCheckResult,
     type FeatureId,
     type FeatureRegistry,
     type FeatureState,
     FeatureNotEnabledError,
-    getAncestorFeatureIds
 } from "./types.ts";
 
 /**
  * Check if a feature is enabled in the registry.
- *
- * If the feature is not directly in the registry, this function
- * checks if any ancestor feature is enabled (hierarchical lookup).
  *
  * @param id - The feature ID to check
  * @param registry - The feature registry to check against
  * @returns true if the feature is enabled
  */
 export function isEnabled(id: FeatureId, registry: FeatureRegistry): boolean {
-  // Direct lookup
   const state = registry.states.get(id);
-  if (state) {
-    return state.enabled;
-  }
-
-  // Check if any ancestor is enabled (for features not explicitly in schema)
-  const ancestors = getAncestorFeatureIds(id);
-  for (const ancestorId of ancestors) {
-    const ancestorState = registry.states.get(ancestorId);
-    if (ancestorState?.enabled) {
-      // Check if the ancestor cascades to children
-      const ancestorDef = registry.schema.features.get(ancestorId);
-      if (ancestorDef?.cascadeToChildren !== false) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return state?.enabled ?? false;
 }
 
 /**
@@ -91,7 +68,6 @@ export function requireFeature(id: FeatureId, registry: FeatureRegistry): void {
  * @param id - The feature ID to check
  * @param registry - The feature registry to check against
  * @returns A FeatureCheckResult with detailed information
- * @throws FeatureNotFoundError if the feature is not in the registry
  */
 export function checkFeature(
   id: FeatureId,
@@ -100,26 +76,6 @@ export function checkFeature(
   const state = registry.states.get(id);
 
   if (!state) {
-    // Check if any ancestor is enabled
-    const ancestors = getAncestorFeatureIds(id);
-    for (const ancestorId of ancestors) {
-      const ancestorState = registry.states.get(ancestorId);
-      if (ancestorState?.enabled) {
-        const ancestorDef = registry.schema.features.get(ancestorId);
-        if (ancestorDef?.cascadeToChildren !== false) {
-          return {
-            enabled: true,
-            featureId: id,
-            state: {
-              enabled: true,
-              reason: "parent-enabled",
-              source: ancestorState.source,
-            },
-          };
-        }
-      }
-    }
-
     // Feature not found, return disabled state
     return {
       enabled: false,
@@ -139,58 +95,35 @@ export function checkFeature(
 }
 
 /**
- * Expand a list of feature IDs to include all child features.
+ * Expand a list of feature IDs.
+ * With flat features, this just returns the input list (no hierarchy to expand).
  *
  * @param ids - The feature IDs to expand
- * @param registry - The feature registry for hierarchy lookup
- * @returns Expanded set of feature IDs including all children
+ * @param _registry - The feature registry (unused, features are flat)
+ * @returns The same feature IDs (no expansion needed)
  */
 export function expandFeatures(
   ids: FeatureId[],
-  registry: FeatureRegistry
+  _registry: FeatureRegistry
 ): FeatureId[] {
-  const expanded = new Set<FeatureId>();
-
-  for (const id of ids) {
-    // Add the feature itself
-    expanded.add(id);
-
-    // Add all descendants
-    const descendants = getDescendantFeatureIds(registry.schema, id);
-    for (const descendantId of descendants) {
-      expanded.add(descendantId);
-    }
-  }
-
-  return [...expanded];
+  // Features are flat - no expansion needed
+  return [...ids];
 }
 
 /**
- * Contract a list of feature IDs to include only the root features.
- * This is the inverse of expandFeatures.
+ * Contract a list of feature IDs.
+ * With flat features, this just returns the input list (no hierarchy to contract).
  *
  * @param ids - The feature IDs to contract
- * @param registry - The feature registry for hierarchy lookup
- * @returns Contracted set of feature IDs with only root features
+ * @param _registry - The feature registry (unused, features are flat)
+ * @returns The same feature IDs (no contraction needed)
  */
 export function contractFeatures(
   ids: FeatureId[],
-  registry: FeatureRegistry
+  _registry: FeatureRegistry
 ): FeatureId[] {
-  const idSet = new Set(ids.map((id) => id as string));
-  const roots: FeatureId[] = [];
-
-  for (const id of ids) {
-    // Check if any ancestor is also in the list
-    const ancestors = getAncestorFeatureIds(id);
-    const hasAncestorInList = ancestors.some((a) => idSet.has(a as string));
-
-    if (!hasAncestorInList) {
-      roots.push(id);
-    }
-  }
-
-  return roots;
+  // Features are flat - no contraction needed
+  return [...ids];
 }
 
 /**

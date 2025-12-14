@@ -15,12 +15,15 @@ export type FeatureId = string & { readonly __brand: unique symbol };
 
 /**
  * Regex pattern for valid feature IDs.
- * Must be lowercase alphanumeric with dots and hyphens, no leading/trailing dots.
+ * Must be lowercase alphanumeric with hyphens (kebab-case), following Cargo conventions.
+ * The `/` separator is reserved for dependency feature references (e.g., "dep-name/feature").
  */
-const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[-.]?[a-z0-9]+)*$/;
+const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
 /**
  * Validates that a string is a valid feature ID format.
+ * Feature IDs must be kebab-case (lowercase alphanumeric with hyphens).
+ * The `/` separator is reserved for dependency feature references.
  *
  * @param id - The string to validate
  * @returns True if the string is a valid feature ID format
@@ -29,12 +32,16 @@ export function isValidFeatureId(id: string): boolean {
   if (!id || id.length === 0) {
     return false;
   }
-  // Check for leading/trailing dots or hyphens
-  if (id.startsWith(".") || id.endsWith(".") || id.startsWith("-") || id.endsWith("-")) {
+  // Check for leading/trailing hyphens
+  if (id.startsWith("-") || id.endsWith("-")) {
     return false;
   }
-  // Check for consecutive dots or mixed dot-hyphen
-  if (id.includes("..") || id.includes(".-") || id.includes("-.")) {
+  // Check for consecutive hyphens
+  if (id.includes("--")) {
+    return false;
+  }
+  // Dots are not allowed - use kebab-case
+  if (id.includes(".")) {
     return false;
   }
   return FEATURE_ID_PATTERN.test(id);
@@ -52,7 +59,7 @@ export function featureId(id: string): FeatureId {
   if (!isValidFeatureId(id)) {
     throw new FeatureIdFormatError(
       id,
-      "Feature ID must be lowercase alphanumeric with dots for hierarchy (e.g., 'shimp.fs')"
+      "Feature ID must be kebab-case (lowercase alphanumeric with hyphens, e.g., 'async-runtime')"
     );
   }
   return id as FeatureId;
@@ -70,100 +77,108 @@ export function unsafeFeatureId(id: string): FeatureId {
 }
 
 /**
- * Gets the parent feature ID from a hierarchical feature ID.
- * Returns undefined if the feature has no parent (is a root feature).
+ * Gets the package name from a dependency feature reference.
+ * Returns undefined if this is not a dependency feature reference.
  *
- * @param id - The feature ID to get the parent of
- * @returns The parent feature ID, or undefined if no parent
+ * Dependency feature references use the format: "package-name/feature-name"
+ *
+ * @param id - The feature reference to parse
+ * @returns The package name, or undefined if not a dep reference
  *
  * @example
- * getParentFeatureId(featureId("shimp.fs.read")) // returns "shimp.fs"
- * getParentFeatureId(featureId("shimp")) // returns undefined
+ * getDepPackage("lodash/clone") // returns "lodash"
+ * getDepPackage("async-runtime") // returns undefined
  */
-export function getParentFeatureId(id: FeatureId): FeatureId | undefined {
-  const lastDotIndex = (id as string).lastIndexOf(".");
-  if (lastDotIndex === -1) {
+export function getDepPackage(id: string): string | undefined {
+  const slashIndex = id.indexOf("/");
+  if (slashIndex === -1) {
     return undefined;
   }
-  return (id as string).slice(0, lastDotIndex) as FeatureId;
+  return id.slice(0, slashIndex);
 }
 
 /**
+ * Gets the feature name from a dependency feature reference.
+ * Returns the full ID if this is not a dependency feature reference.
+ *
+ * @param id - The feature reference to parse
+ * @returns The feature name portion
+ *
+ * @example
+ * getDepFeature("lodash/clone") // returns "clone"
+ * getDepFeature("async-runtime") // returns "async-runtime"
+ */
+export function getDepFeature(id: string): string {
+  const slashIndex = id.indexOf("/");
+  if (slashIndex === -1) {
+    return id;
+  }
+  return id.slice(slashIndex + 1);
+}
+
+/**
+ * Checks if a feature reference is a dependency feature reference.
+ *
+ * @param id - The feature reference to check
+ * @returns True if this references a feature in a dependency
+ *
+ * @example
+ * isDepFeatureRef("lodash/clone") // returns true
+ * isDepFeatureRef("async-runtime") // returns false
+ */
+export function isDepFeatureRef(id: string): boolean {
+  return id.includes("/");
+}
+
+/**
+ * @deprecated Features are now flat (kebab-case). This function is kept for legacy compatibility.
  * Gets all ancestor feature IDs from a hierarchical feature ID.
- * Returns an array from immediate parent to root.
+ * Returns an empty array since features are now flat.
  *
- * @param id - The feature ID to get ancestors of
- * @returns Array of ancestor feature IDs, from immediate parent to root
- *
- * @example
- * getAncestorFeatureIds(featureId("shimp.fs.read")) // returns ["shimp.fs", "shimp"]
+ * @param _id - The feature ID (unused, features are flat)
+ * @returns Empty array (features are flat, no hierarchy)
  */
-export function getAncestorFeatureIds(id: FeatureId): FeatureId[] {
-  const ancestors: FeatureId[] = [];
-  let current = getParentFeatureId(id);
-  while (current !== undefined) {
-    ancestors.push(current);
-    current = getParentFeatureId(current);
-  }
-  return ancestors;
+export function getAncestorFeatureIds(_id: FeatureId): FeatureId[] {
+  // Features are now flat - no hierarchy
+  return [];
 }
 
 /**
+ * @deprecated Features are now flat (kebab-case). This function always returns 0.
  * Gets the depth/level of a feature ID in the hierarchy.
- * Root features have depth 0.
  *
- * @param id - The feature ID
- * @returns The depth (number of dots in the ID)
- *
- * @example
- * getFeatureDepth(featureId("shimp")) // returns 0
- * getFeatureDepth(featureId("shimp.fs")) // returns 1
- * getFeatureDepth(featureId("shimp.fs.read")) // returns 2
+ * @param _id - The feature ID (unused, features are flat)
+ * @returns Always 0 (features are flat, no hierarchy)
  */
-export function getFeatureDepth(id: FeatureId): number {
-  const str = id as string;
-  let count = 0;
-  for (let i = 0; i < str.length; i++) {
-    if (str[i] === ".") {
-      count++;
-    }
-  }
-  return count;
+export function getFeatureDepth(_id: FeatureId): number {
+  // Features are now flat - no hierarchy
+  return 0;
 }
 
 /**
+ * @deprecated Features are now flat (kebab-case). This function always returns false.
  * Checks if one feature ID is an ancestor of another.
  *
- * @param ancestor - The potential ancestor feature ID
- * @param descendant - The potential descendant feature ID
- * @returns True if ancestor is an ancestor of descendant
- *
- * @example
- * isAncestorOf(featureId("shimp"), featureId("shimp.fs")) // returns true
- * isAncestorOf(featureId("shimp.fs"), featureId("shimp")) // returns false
+ * @param _ancestor - The potential ancestor feature ID (unused)
+ * @param _descendant - The potential descendant feature ID (unused)
+ * @returns Always false (features are flat, no hierarchy)
  */
-export function isAncestorOf(ancestor: FeatureId, descendant: FeatureId): boolean {
-  const ancestorStr = ancestor as string;
-  const descendantStr = descendant as string;
-
-  // Ancestor must be shorter
-  if (ancestorStr.length >= descendantStr.length) {
-    return false;
-  }
-
-  // Descendant must start with ancestor followed by a dot
-  return descendantStr.startsWith(ancestorStr + ".");
+export function isAncestorOf(_ancestor: FeatureId, _descendant: FeatureId): boolean {
+  // Features are now flat - no hierarchy
+  return false;
 }
 
 /**
+ * @deprecated Features are now flat (kebab-case). This function always returns false.
  * Checks if one feature ID is a descendant of another.
  *
- * @param descendant - The potential descendant feature ID
- * @param ancestor - The potential ancestor feature ID
- * @returns True if descendant is a descendant of ancestor
+ * @param _descendant - The potential descendant feature ID (unused)
+ * @param _ancestor - The potential ancestor feature ID (unused)
+ * @returns Always false (features are flat, no hierarchy)
  */
-export function isDescendantOf(descendant: FeatureId, ancestor: FeatureId): boolean {
-  return isAncestorOf(ancestor, descendant);
+export function isDescendantOf(_descendant: FeatureId, _ancestor: FeatureId): boolean {
+  // Features are now flat - no hierarchy
+  return false;
 }
 
 // =============================================================================

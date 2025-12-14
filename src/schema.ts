@@ -14,7 +14,6 @@ import {
     type FeatureSchema,
     featureId,
     FeatureSchemaError,
-    getParentFeatureId,
     isValidFeatureId,
 } from "./types.ts";
 
@@ -76,19 +75,13 @@ export function validateFeatureId(id: string): ValidationResult {
 
   if (!isValidFeatureId(id)) {
     errors.push(
-      `Invalid feature ID "${id}": must be lowercase alphanumeric with dots for hierarchy (e.g., 'shimp.fs')`
+      `Invalid feature ID "${id}": must be kebab-case (e.g., 'async-runtime')`
     );
   }
 
   // Warn about very long IDs
   if (id.length > 64) {
     warnings.push(`Feature ID "${id}" is very long (${id.length} chars), consider shortening`);
-  }
-
-  // Warn about deeply nested IDs
-  const depth = id.split(".").length - 1;
-  if (depth > 5) {
-    warnings.push(`Feature ID "${id}" is deeply nested (${depth} levels), consider flattening`);
   }
 
   return {
@@ -164,22 +157,7 @@ export function validateSchema(definitions: FeatureDefinitionInput[]): Validatio
     seenIds.add(def.id);
   }
 
-  // Check parent references
-  for (const def of definitions) {
-    if (!isValidFeatureId(def.id)) continue;
-
-    const parentId = getParentFeatureId(featureId(def.id));
-    if (parentId && !seenIds.has(parentId as string)) {
-      // Parent is implied by the ID but not explicitly defined
-      // This is actually okay - we'll create implicit parents
-      // But warn about it
-      warnings.push(
-        `Feature "${def.id}" implies parent "${parentId}" which is not explicitly defined`
-      );
-    }
-  }
-
-  // Check for circular dependencies (shouldn't be possible with dot notation, but check anyway)
+  // Check for circular dependencies
   const circularPaths = detectCircularDependencies(definitions);
   for (const path of circularPaths) {
     errors.push(`Circular dependency detected: ${path}`);
@@ -194,48 +172,16 @@ export function validateSchema(definitions: FeatureDefinitionInput[]): Validatio
 
 /**
  * Detects circular dependencies in feature definitions.
- * With dot-notation hierarchy, circular dependencies shouldn't be possible,
- * but this function validates that invariant.
+ * With flat features, this is a no-op since there's no hierarchy.
+ * Kept for API compatibility with the legacy schema system.
  *
- * @param definitions - Array of feature definitions to check
- * @returns Array of circular dependency path descriptions
+ * @param _definitions - Array of feature definitions to check (unused)
+ * @returns Empty array (flat features have no hierarchy to create cycles)
  */
-export function detectCircularDependencies(definitions: FeatureDefinitionInput[]): string[] {
-  const circularPaths: string[] = [];
-
-  // Build a map of ID to definition
-  const definitionMap = new Map<string, FeatureDefinitionInput>();
-  for (const def of definitions) {
-    definitionMap.set(def.id, def);
-  }
-
-  // For each feature, walk up its parent chain looking for cycles
-  for (const def of definitions) {
-    if (!isValidFeatureId(def.id)) continue;
-
-    const visited = new Set<string>();
-    const path: string[] = [def.id];
-    visited.add(def.id);
-
-    let currentId: FeatureId | undefined = featureId(def.id);
-    while (currentId) {
-      const parentId = getParentFeatureId(currentId);
-      if (!parentId) break;
-
-      const parentStr = parentId as string;
-      if (visited.has(parentStr)) {
-        // This shouldn't happen with dot notation, but check anyway
-        circularPaths.push(`${path.join(" -> ")} -> ${parentStr}`);
-        break;
-      }
-
-      visited.add(parentStr);
-      path.push(parentStr);
-      currentId = parentId;
-    }
-  }
-
-  return circularPaths;
+export function detectCircularDependencies(_definitions: FeatureDefinitionInput[]): string[] {
+  // Flat features have no parent-child hierarchy, so no cycles are possible
+  // Circular dependencies in the manifest system are handled by manifest.ts
+  return [];
 }
 
 /**
@@ -259,16 +205,15 @@ export function buildSchema(definitions: FeatureDefinitionInput[]): FeatureSchem
   const childrenMap = new Map<FeatureId, FeatureId[]>();
   const roots: FeatureId[] = [];
 
-  // First pass: create all feature definitions
+  // Create all feature definitions (flat, no parent-child hierarchy)
   for (const input of definitions) {
     const id = featureId(input.id);
-    const parentId = getParentFeatureId(id);
 
     const definition: FeatureDefinition = {
       id,
       name: input.name,
       description: input.description,
-      parent: parentId,
+      parent: undefined, // Flat features have no parent
       cascadeToChildren: input.cascadeToChildren ?? true,
       defaultEnabled: input.defaultEnabled ?? false,
       metadata: input.metadata,
@@ -276,20 +221,11 @@ export function buildSchema(definitions: FeatureDefinitionInput[]): FeatureSchem
 
     features.set(id, definition);
 
-    // Track roots
-    if (!parentId) {
-      roots.push(id);
-    }
+    // All features are roots in flat model
+    roots.push(id);
   }
 
-  // Second pass: build children map
-  for (const [id, def] of features) {
-    if (def.parent) {
-      const siblings = childrenMap.get(def.parent) ?? [];
-      siblings.push(id);
-      childrenMap.set(def.parent, siblings);
-    }
-  }
+  // No children map needed for flat features
 
   // Convert children map to readonly
   const children = new Map<FeatureId, readonly FeatureId[]>();

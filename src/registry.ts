@@ -2,12 +2,12 @@
  * Feature registry implementation
  *
  * The registry holds all registered features and their current enable/disable state.
- * It supports hierarchical feature expansion (parent.child notation).
+ * Features are flat (no hierarchy) - use the manifest system for Cargo-style feature dependencies.
  *
  * @module
  */
 
-import { buildSchema, createEmptySchema, getDescendantFeatureIds } from "./schema.ts";
+import { buildSchema, createEmptySchema } from "./schema.ts";
 import {
     type FeatureConfig,
     type FeatureDefinition,
@@ -19,7 +19,6 @@ import {
     type ResolvedConfig,
     featureId,
     FeatureNotFoundError,
-    getAncestorFeatureIds
 } from "./types.ts";
 
 /**
@@ -124,52 +123,32 @@ function computeInitialState(
 }
 
 /**
- * Applies an enable to a feature and optionally cascades to children.
+ * Applies an enable to a feature.
+ * Features are flat - no cascading to children.
  */
 function applyEnable(
   id: FeatureId,
   states: Map<FeatureId, FeatureState>,
-  schema: FeatureSchema,
+  _schema: FeatureSchema,
   source: ResolvedConfig["source"],
   reason: FeatureStateReason
 ): void {
-  const definition = schema.features.get(id);
-
   // Set the feature state
   states.set(id, {
     enabled: true,
     reason,
     source,
   });
-
-  // Cascade to children if configured
-  if (definition?.cascadeToChildren !== false) {
-    const descendants = getDescendantFeatureIds(schema, id);
-    for (const childId of descendants) {
-      // Only cascade if not already explicitly set
-      const currentState = states.get(childId);
-      if (
-        !currentState ||
-        currentState.reason === "default-disabled" ||
-        currentState.reason === "default-enabled"
-      ) {
-        states.set(childId, {
-          enabled: true,
-          reason: "parent-enabled",
-          source,
-        });
-      }
-    }
-  }
 }
 
 /**
- * Applies a disable to a feature and optionally cascades to children.
+ * Applies a disable to a feature.
+ * Features are flat - no cascading to children.
  */
 function applyDisable(
   id: FeatureId,
   states: Map<FeatureId, FeatureState>,
-  schema: FeatureSchema,
+  _schema: FeatureSchema,
   source: ResolvedConfig["source"],
   reason: FeatureStateReason
 ): void {
@@ -179,16 +158,6 @@ function applyDisable(
     reason,
     source,
   });
-
-  // Cascade disable to children
-  const descendants = getDescendantFeatureIds(schema, id);
-  for (const childId of descendants) {
-    states.set(childId, {
-      enabled: false,
-      reason: "parent-disabled",
-      source,
-    });
-  }
 }
 
 /**
@@ -222,34 +191,13 @@ export function getFeatureState(
 /**
  * Checks if a feature is enabled.
  *
- * If the feature is not in the registry, this function checks if any
- * ancestor feature is enabled (hierarchical lookup).
- *
  * @param registry - The feature registry
  * @param id - The feature ID to check
  * @returns True if the feature is enabled
  */
 export function isEnabled(registry: FeatureRegistry, id: FeatureId): boolean {
-  // Direct lookup
   const state = registry.states.get(id);
-  if (state) {
-    return state.enabled;
-  }
-
-  // Check if any ancestor is enabled (for features not explicitly in schema)
-  const ancestors = getAncestorFeatureIds(id);
-  for (const ancestorId of ancestors) {
-    const ancestorState = registry.states.get(ancestorId);
-    if (ancestorState?.enabled) {
-      // Check if the ancestor cascades to children
-      const ancestorDef = registry.schema.features.get(ancestorId);
-      if (ancestorDef?.cascadeToChildren !== false) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return state?.enabled ?? false;
 }
 
 /**
@@ -272,11 +220,6 @@ export function isDisabled(registry: FeatureRegistry, id: FeatureId): boolean {
  */
 export function requireFeature(registry: FeatureRegistry, id: FeatureId): void {
   if (!isEnabled(registry, id)) {
-    const state = registry.states.get(id) ?? {
-      enabled: false,
-      reason: "default-disabled" as const,
-    };
-
     throw new FeatureNotFoundError(id as string);
   }
 }

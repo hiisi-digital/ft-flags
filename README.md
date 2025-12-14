@@ -7,22 +7,21 @@
 [![GitHub Issues](https://img.shields.io/github/issues/hiisi-digital/ft-flags.svg)](https://github.com/hiisi-digital/ft-flags/issues)
 ![License](https://img.shields.io/github/license/hiisi-digital/ft-flags?color=%23009689)
 
-> Feature flag definitions and evaluation for TypeScript - the foundation for conditional compilation based on features.
+> Feature flags for TypeScript with Cargo-style feature definitions, conditional compilation, and CLI tooling.
 
 </div>
 
-## What it does
+## Overview
 
-`ft-flags` provides a robust feature flag system for TypeScript applications. It defines how features are declared, evaluated, and composed, serving as the foundation for feature-based conditional compilation.
+`ft-flags` provides a robust feature flag system for TypeScript that follows the same conventions as Cargo features in Rust. Features can be:
 
-This package includes:
+- **Declared statically** in your `deno.json` or `package.json`
+- **Composed together** into feature sets
+- **Enabled by default** or opt-in
+- **Validated at build time** via JSON schema
+- **Queried via CLI** for scripting and debugging
 
-- **Feature flag schema** with validation and type safety
-- **Feature evaluation** at both runtime and compile-time
-- **Feature composition** with boolean logic (all, any, not)
-- **Configuration loading** from various sources (config files, environment, CLI)
-
-It integrates with `@hiisi/cfg-ts` to enable `@cfg(feature("my.feature"))` syntax for conditional compilation.
+This package serves as the foundation for conditional compilation in the `@hiisi/cfg-ts` ecosystem.
 
 ## Installation
 
@@ -34,12 +33,465 @@ deno add jsr:@hiisi/ft-flags
 npm install ft-flags
 ```
 
+## Feature Model
+
+### Declaring Features
+
+Features are declared at the root level of your `deno.json` or `package.json`. The format follows Cargo's conventions:
+
+```json
+{
+  "name": "@my/package",
+  "version": "1.0.0",
+  "features": {
+    "default": ["std"],
+    "std": ["fs", "env"],
+    "full": ["std", "experimental"],
+    "fs": [],
+    "env": [],
+    "args": [],
+    "experimental": ["async-runtime"],
+    "async-runtime": []
+  }
+}
+```
+
+### Naming Conventions
+
+Feature names follow Cargo conventions:
+
+- **Kebab-case**: Feature names use lowercase with hyphens: `async-runtime`, `serde-support`
+- **`/` for dependency features**: Enable features from dependencies: `lodash/clone`, `@scope/pkg/feature`
+- **`dep:` for optional deps**: Enable optional dependencies: `dep:tokio`
+
+### Key Concepts
+
+#### The `default` Feature
+
+The `default` feature is special — it lists the features that are enabled when no explicit feature selection is made. This is equivalent to Cargo's `default` feature.
+
+```json
+{
+  "features": {
+    "default": ["std", "logging"]
+  }
+}
+```
+
+To disable default features, use the `--no-default-features` CLI flag or set `defaultFeatures: false` in your config.
+
+#### Feature Dependencies
+
+Each feature maps to an array of features it **activates**. When you enable a feature, all features it lists are also enabled (transitively).
+
+```json
+{
+  "features": {
+    "full": ["std", "experimental", "async-runtime"],
+    "std": ["shimp.fs", "shimp.env"]
+  }
+}
+```
+
+Enabling `full` will enable: `full`, `std`, `experimental`, `async-runtime`, `shimp.fs`, `shimp.env`.
+
+#### Dependency Features
+
+Enable features from your dependencies using `/`:
+
+```json
+{
+  "features": {
+    "serialization": ["serde/derive", "@myorg/utils/json"],
+    "async": ["tokio/full"]
+  }
+}
+```
+
+#### Optional Dependencies
+
+Similar to Cargo's `dep:` syntax, you can reference optional package dependencies:
+
+```json
+{
+  "features": {
+    "async": ["dep:async-hooks"],
+    "tracing": ["dep:opentelemetry"]
+  }
+}
+```
+
+*Note: `dep:` integration with package managers is planned for a future release.*
+
+### Feature Metadata
+
+You can add metadata to features for documentation and tooling. Metadata uses the `metadata.features` namespace, following the convention used by Cargo's `[package.metadata.X]`:
+
+```json
+{
+  "name": "@my/package",
+  "features": {
+    "default": ["std"],
+    "std": ["fs", "env"],
+    "experimental": []
+  },
+  "metadata": {
+    "features": {
+      "std": {
+        "description": "Standard library features for cross-runtime compatibility"
+      },
+      "experimental": {
+        "description": "Unstable features that may change",
+        "unstable": true
+      },
+      "legacy-api": {
+        "description": "Use the new API instead",
+        "deprecated": true,
+        "deprecatedMessage": "Migrate to v2-api feature"
+      }
+    }
+  }
+}
+```
+
+## Configuration
+
+### Full Configuration Schema
+
+```json
+{
+  "name": "@my/package",
+  "features": {
+    "default": ["..."],
+    "feature-name": ["dependency1", "dependency2"]
+  },
+  "metadata": {
+    "features": {
+      "feature-name": {
+        "description": "Human-readable description",
+        "since": "1.0.0",
+        "unstable": false,
+        "deprecated": false,
+        "deprecatedMessage": "..."
+      }
+    }
+  }
+}
+```
+
+### Environment Variables
+
+Override features at runtime via environment variables:
+
+```bash
+# Enable specific features
+FT_FLAGS_FEATURES=experimental,async-runtime
+
+# Disable default features
+FT_FLAGS_NO_DEFAULT_FEATURES=true
+
+# Enable all features
+FT_FLAGS_ALL_FEATURES=true
+```
+
+### CLI Arguments
+
+Pass feature flags via command line:
+
+```bash
+my-app --features experimental,async-runtime
+my-app --no-default-features
+my-app --all-features
+```
+
+## CLI Tool
+
+`ft-flags` includes a CLI (`ft`) for querying and validating features.
+
+### Installation
+
+```bash
+# Global install via Deno
+deno install -A -n ft jsr:@hiisi/ft-flags/cli
+
+# Or run directly
+deno run -A jsr:@hiisi/ft-flags/cli <command>
+
+# Or via deno task (when in a project with ft-flags)
+deno task ft <command>
+```
+
+### Commands
+
+#### `ft list`
+
+List all available features for the current package.
+
+```bash
+$ ft list
+Available features:
+  default       -> [std]
+  std           -> [fs, env]
+  fs            -> []
+  env           -> []
+  experimental  -> []
+
+$ ft list --enabled
+Enabled features (with default):
+  [ok] default
+  [ok] std
+  [ok] fs
+  [ok] env
+```
+
+#### `ft check <feature>`
+
+Check if a specific feature is enabled.
+
+```bash
+$ ft check fs
+[ok] fs is enabled (via: default -> std -> fs)
+
+$ ft check experimental
+[x] experimental is not enabled
+
+$ ft check experimental --features experimental
+[ok] experimental is enabled (explicit)
+```
+
+Exit codes: `0` if enabled, `1` if disabled.
+
+#### `ft resolve`
+
+Show the fully resolved set of enabled features.
+
+```bash
+$ ft resolve
+Resolved features:
+  default, std, fs, env
+
+$ ft resolve --features full --no-default-features
+Resolved features:
+  full, std, experimental, async-runtime, fs, env
+
+$ ft resolve --all-features
+Resolved features:
+  default, std, full, experimental, async-runtime, fs, env, args
+```
+
+#### `ft tree [feature]`
+
+Display the feature dependency tree.
+
+```bash
+$ ft tree
+Feature tree:
+default
+`-- std
+    |-- fs
+    `-- env
+full
+|-- std
+|   |-- fs
+|   `-- env
+`-- experimental
+    `-- async-runtime
+args
+
+$ ft tree full
+full
+|-- std
+|   |-- fs
+|   `-- env
+`-- experimental
+    `-- async-runtime
+```
+
+#### `ft validate`
+
+Validate the feature configuration.
+
+```bash
+$ ft validate
+[ok] Configuration is valid
+
+$ ft validate
+[x] Error: Circular dependency detected: full -> experimental -> full
+[x] Error: Unknown feature referenced: "nonexistent" in feature "std"
+```
+
+### Package-Specific Queries
+
+Query features for a specific package in a workspace:
+
+```bash
+$ ft list --package @myorg/subpackage
+$ ft check fs --package ./packages/my-lib
+```
+
+## Programmatic API
+
+### Basic Usage
+
+```typescript
+import {
+  loadManifest,
+  resolveFeatures,
+  isFeatureEnabled,
+  listAvailableFeatures,
+} from "@hiisi/ft-flags";
+
+// Load features from deno.json or package.json
+const manifest = await loadManifest();
+
+// Resolve with default features
+const resolved = resolveFeatures(manifest);
+
+// Check if a feature is enabled
+if (isFeatureEnabled("fs", resolved)) {
+  // Use filesystem features
+}
+
+// List all available features
+const available = listAvailableFeatures(manifest);
+console.log(available); // ["default", "std", "shimp.fs", ...]
+```
+
+### Custom Feature Selection
+
+```typescript
+import { resolveFeatures } from "@hiisi/ft-flags";
+
+// Enable specific features, no defaults
+const resolved = resolveFeatures(manifest, {
+  features: ["experimental", "shimp.fs"],
+  noDefaultFeatures: true,
+});
+
+// Enable all features
+const all = resolveFeatures(manifest, {
+  allFeatures: true,
+});
+```
+
+### Building a Registry
+
+```typescript
+import {
+  loadManifest,
+  buildRegistry,
+  isEnabled,
+  featureId,
+} from "@hiisi/ft-flags";
+
+const manifest = await loadManifest();
+
+const registry = buildRegistry(manifest, {
+  features: ["std"],
+  noDefaultFeatures: false,
+});
+
+// Type-safe feature checks
+if (isEnabled(featureId("fs"), registry)) {
+  // ...
+}
+```
+
+### Schema Validation
+
+```typescript
+import { validateManifest } from "@hiisi/ft-flags";
+
+const result = validateManifest({
+  features: {
+    default: ["std"],
+    std: ["unknown-feature"], // Error!
+  },
+});
+
+if (!result.valid) {
+  console.error(result.errors);
+  // ["Unknown feature 'unknown-feature' referenced in 'std'"]
+}
+```
+
+## JSON Schema
+
+A JSON schema is provided for editor validation and autocompletion.
+
+### VS Code / Editors
+
+Add to your `settings.json`:
+
+```json
+{
+  "json.schemas": [
+    {
+      "fileMatch": ["deno.json", "package.json"],
+      "url": "https://jsr.io/@hiisi/ft-flags/schema.json"
+    }
+  ]
+}
+```
+
+### Schema URL
+
+```
+https://jsr.io/@hiisi/ft-flags/schema.json
+```
+
+### Generating Types from Schema
+
+```typescript
+import { generateTypesFromSchema } from "@hiisi/ft-flags/codegen";
+
+// Generate TypeScript types from your manifest
+const types = await generateTypesFromSchema("./deno.json");
+// Outputs: type MyFeatures = "default" | "std" | "shimp.fs" | ...
+```
+
+## Integration with cfg-ts
+
+`ft-flags` is designed to work with `@hiisi/cfg-ts` for conditional compilation:
+
+```typescript
+import { cfg } from "@hiisi/cfg-ts";
+
+// @cfg(feature("fs"))
+export function readFile(path: string): string {
+  // This function is only included when fs is enabled
+}
+
+// @cfg(not(feature("experimental")))
+export function stableApi(): void {
+  // Only included when experimental is NOT enabled
+}
+
+// @cfg(all(feature("std"), not(feature("legacy"))))
+export function modernStdLib(): void {
+  // Complex predicates
+}
+```
+
+## Comparison with Cargo
+
+| Cargo | ft-flags | Notes |
+|-------|----------|-------|
+| `[features]` | `"features": {}` | Same concept |
+| `default = ["std"]` | `"default": ["std"]` | Same semantics |
+| `foo = ["bar", "baz"]` | `"foo": ["bar", "baz"]` | Feature enables others |
+| `dep:optional-dep` | `"dep:pkg-name"` | Optional dependency |
+| `serde/derive` | `"serde/derive"` | Dep feature reference |
+| `--features foo` | `--features foo` | CLI flag |
+| `--no-default-features` | `--no-default-features` | Disable defaults |
+| `--all-features` | `--all-features` | Enable everything |
+
 ## Related Packages
 
-- [`@hiisi/otso`](https://jsr.io/@hiisi/otso) - The build framework that orchestrates feature flags
-- [`@hiisi/cfg-ts`](https://jsr.io/@hiisi/cfg-ts) - The @cfg decorator that consumes feature predicates
+- [`@hiisi/cfg-ts`](https://jsr.io/@hiisi/cfg-ts) - Conditional compilation with `@cfg()` syntax
+- [`@hiisi/otso`](https://jsr.io/@hiisi/otso) - Build framework that orchestrates feature-based builds
 - [`@hiisi/tgts`](https://jsr.io/@hiisi/tgts) - Target definitions (runtime, platform, arch)
-- [`@hiisi/onlywhen`](https://jsr.io/@hiisi/onlywhen) - Runtime detection and conditional execution
+- [`@hiisi/onlywhen`](https://jsr.io/@hiisi/onlywhen) - Runtime feature detection
 
 ## Support
 

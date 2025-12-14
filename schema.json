@@ -1,0 +1,201 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://jsr.io/@hiisi/ft-flags/schema.json",
+  "title": "ft-flags Configuration",
+  "description": "Feature flags configuration for TypeScript projects, following Cargo-style conventions. Features are defined at the root level of deno.json or package.json.",
+  "type": "object",
+  "properties": {
+    "features": {
+      "$ref": "#/definitions/FeatureMap",
+      "description": "Map of feature names to their dependencies. Each feature activates the features listed in its array."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Metadata namespace for tooling. Feature metadata lives under metadata.features.",
+      "properties": {
+        "features": {
+          "$ref": "#/definitions/FeatureMetadataMap",
+          "description": "Optional metadata for features (descriptions, deprecation info, etc.)"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "FeatureMap": {
+      "type": "object",
+      "description": "Map of feature names to arrays of features they activate",
+      "additionalProperties": {
+        "$ref": "#/definitions/FeatureDependencies"
+      },
+      "propertyNames": {
+        "$ref": "#/definitions/FeatureId"
+      },
+      "examples": [
+        {
+          "default": ["std"],
+          "std": ["shimp.fs", "shimp.env"],
+          "shimp.fs": [],
+          "shimp.env": [],
+          "experimental": []
+        }
+      ]
+    },
+    "FeatureDependencies": {
+      "type": "array",
+      "description": "List of features that this feature activates when enabled",
+      "items": {
+        "$ref": "#/definitions/FeatureReference"
+      },
+      "uniqueItems": true,
+      "examples": [
+        [],
+        ["std"],
+        ["shimp.fs", "shimp.env", "shimp.args"]
+      ]
+    },
+    "FeatureId": {
+      "type": "string",
+      "description": "A valid feature identifier. Must be kebab-case (lowercase alphanumeric with hyphens). The '/' separator is reserved for dependency feature references.",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 128,
+      "examples": [
+        "default",
+        "std",
+        "async-runtime",
+        "serde-support",
+        "v2-api"
+      ]
+    },
+    "FeatureReference": {
+      "type": "string",
+      "description": "A reference to another feature, dependency feature, or optional dependency. Can be a feature ID, 'pkg/feature' for dependency features, or 'dep:package-name' for optional dependencies.",
+      "pattern": "^(dep:)?(@?[a-z][a-z0-9]*(?:-[a-z0-9]+)*(/[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*)$",
+      "minLength": 1,
+      "maxLength": 128,
+      "examples": [
+        "std",
+        "async-runtime",
+        "serde/derive",
+        "@myorg/utils/json",
+        "dep:tokio",
+        "dep:opentelemetry"
+      ]
+    },
+    "FeatureMetadataMap": {
+      "type": "object",
+      "description": "Map of feature names to their metadata",
+      "additionalProperties": {
+        "$ref": "#/definitions/FeatureMetadata"
+      },
+      "propertyNames": {
+        "$ref": "#/definitions/FeatureId"
+      }
+    },
+    "FeatureMetadata": {
+      "type": "object",
+      "description": "Metadata associated with a feature",
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this feature provides"
+        },
+        "since": {
+          "type": "string",
+          "description": "The version when this feature was introduced",
+          "pattern": "^\\d+\\.\\d+(\\.\\d+)?(-[a-zA-Z0-9.]+)?(\\+[a-zA-Z0-9.]+)?$",
+          "examples": ["1.0.0", "2.1.0-beta.1"]
+        },
+        "unstable": {
+          "type": "boolean",
+          "description": "Whether this feature is unstable and may change without notice",
+          "default": false
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "Whether this feature is deprecated",
+          "default": false
+        },
+        "deprecatedMessage": {
+          "type": "string",
+          "description": "Message explaining why the feature is deprecated and what to use instead"
+        },
+        "docsUrl": {
+          "type": "string",
+          "description": "URL to documentation for this feature",
+          "format": "uri"
+        },
+        "requiredDeps": {
+          "type": "array",
+          "description": "List of package dependencies required when this feature is enabled",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true,
+      "if": {
+        "properties": {
+          "deprecated": { "const": true }
+        },
+        "required": ["deprecated"]
+      },
+      "then": {
+        "required": ["deprecatedMessage"]
+      }
+    },
+    "ResolveOptions": {
+      "type": "object",
+      "description": "Options for resolving which features are enabled",
+      "properties": {
+        "features": {
+          "type": "array",
+          "description": "List of features to explicitly enable",
+          "items": {
+            "$ref": "#/definitions/FeatureId"
+          },
+          "uniqueItems": true
+        },
+        "noDefaultFeatures": {
+          "type": "boolean",
+          "description": "If true, the 'default' feature is not automatically enabled",
+          "default": false
+        },
+        "allFeatures": {
+          "type": "boolean",
+          "description": "If true, all available features are enabled",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "examples": [
+    {
+      "name": "@my/package",
+      "version": "1.0.0",
+      "features": {
+        "default": ["std"],
+        "std": ["fs", "env"],
+        "full": ["std", "experimental"],
+        "fs": [],
+        "env": [],
+        "args": [],
+        "experimental": ["async-runtime"],
+        "async-runtime": []
+      },
+      "metadata": {
+        "features": {
+          "std": {
+            "description": "Standard library features for cross-runtime compatibility"
+          },
+          "experimental": {
+            "description": "Experimental features that may change between versions",
+            "unstable": true
+          }
+        }
+      }
+    }
+  ]
+}

@@ -2,8 +2,32 @@
   "name": "@hiisi/ft-flags",
   "version": "0.1.0",
   "license": "MPL-2.0",
+  "features": {
+    "default": ["std"],
+    "std": ["fs", "env"],
+    "full": ["std", "experimental"],
+    "fs": [],
+    "env": [],
+    "args": [],
+    "experimental": ["async-runtime"],
+    "async-runtime": []
+  },
+  "metadata": {
+    "features": {
+      "std": {
+        "description": "Standard library features for cross-runtime compatibility"
+      },
+      "experimental": {
+        "description": "Experimental features that may change between versions",
+        "unstable": true
+      }
+    }
+  },
   "exports": {
-    ".": "./mod.ts"
+    ".": "./mod.ts",
+    "./cli": "./src/cli.ts",
+    "./manifest": "./src/manifest.ts",
+    "./schema": "./schema.json"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1.0.0",
@@ -63,12 +87,14 @@
     "fmt:check": "deno fmt --check",
     "check": "deno check mod.ts",
     "all": "deno task fmt && deno task lint && deno task check && deno task test",
-    "prepublish": "deno task all"
+    "prepublish": "deno task all",
+    "ft": "deno run --allow-read --allow-env src/cli.ts"
   },
   "publish": {
     "include": [
       "mod.ts",
       "src/**/*.ts",
+      "schema.json",
       "README.md",
       "LICENSE"
     ],

@@ -191,57 +191,56 @@ describe("FeatureRegistry", () => {
     });
   });
 
-  describe("hierarchical features", () => {
-    it("should expand parent feature to include children", () => {
+  describe("feature groups", () => {
+    it("should enable multiple features independently", () => {
       const schema = buildSchema([
-        { id: "shimp" },
-        { id: "shimp.fs" },
-        { id: "shimp.env" },
+        { id: "runtime" },
+        { id: "fs-support" },
+        { id: "env-support" },
       ]);
       const registry = createRegistry({
         schema,
-        config: { enabled: ["shimp"] },
+        config: { enabled: ["runtime", "fs-support"] },
       });
 
-      // Parent and children should all be enabled
-      assertEquals(isEnabled(registry, featureId("shimp")), true);
-      assertEquals(isEnabled(registry, featureId("shimp.fs")), true);
-      assertEquals(isEnabled(registry, featureId("shimp.env")), true);
+      assertEquals(isEnabled(registry, featureId("runtime")), true);
+      assertEquals(isEnabled(registry, featureId("fs-support")), true);
+      assertEquals(isEnabled(registry, featureId("env-support")), false);
     });
 
-    it("should allow disabling child even when parent is enabled", () => {
+    it("should allow enabling and disabling features", () => {
       const schema = buildSchema([
-        { id: "shimp" },
-        { id: "shimp.fs" },
-        { id: "shimp.env" },
+        { id: "base" },
+        { id: "fs-support" },
+        { id: "env-support" },
       ]);
       const registry = createRegistry({
         schema,
         config: {
-          enabled: ["shimp"],
-          disabled: ["shimp.fs"],
+          enabled: ["base", "fs-support", "env-support"],
+          disabled: ["fs-support"],
         },
       });
 
-      assertEquals(isEnabled(registry, featureId("shimp")), true);
-      assertEquals(isEnabled(registry, featureId("shimp.fs")), false);
-      assertEquals(isEnabled(registry, featureId("shimp.env")), true);
+      assertEquals(isEnabled(registry, featureId("base")), true);
+      assertEquals(isEnabled(registry, featureId("fs-support")), false);
+      assertEquals(isEnabled(registry, featureId("env-support")), true);
     });
 
-    it("should disable children when parent is disabled", () => {
+    it("should disable features explicitly", () => {
       const schema = buildSchema([
-        { id: "shimp", defaultEnabled: true },
-        { id: "shimp.fs", defaultEnabled: true },
-        { id: "shimp.env", defaultEnabled: true },
+        { id: "base", defaultEnabled: true },
+        { id: "fs-support", defaultEnabled: true },
+        { id: "env-support", defaultEnabled: true },
       ]);
       const registry = createRegistry({
         schema,
-        config: { disabled: ["shimp"] },
+        config: { disabled: ["base", "fs-support", "env-support"] },
       });
 
-      assertEquals(isEnabled(registry, featureId("shimp")), false);
-      assertEquals(isEnabled(registry, featureId("shimp.fs")), false);
-      assertEquals(isEnabled(registry, featureId("shimp.env")), false);
+      assertEquals(isEnabled(registry, featureId("base")), false);
+      assertEquals(isEnabled(registry, featureId("fs-support")), false);
+      assertEquals(isEnabled(registry, featureId("env-support")), false);
     });
   });
 
@@ -331,10 +330,10 @@ describe("FeatureRegistry", () => {
 
   describe("createSimpleRegistry", () => {
     it("should create a registry with enabled features", () => {
-      const registry = createSimpleRegistry(["shimp.fs", "shimp.env"]);
+      const registry = createSimpleRegistry(["fs-support", "env-support"]);
 
-      assertEquals(isEnabled(registry, featureId("shimp.fs")), true);
-      assertEquals(isEnabled(registry, featureId("shimp.env")), true);
+      assertEquals(isEnabled(registry, featureId("fs-support")), true);
+      assertEquals(isEnabled(registry, featureId("env-support")), true);
     });
   });
 
