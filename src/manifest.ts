@@ -7,7 +7,7 @@
  *
  * Feature naming conventions (following Cargo):
  * - Feature names use kebab-case: `async-runtime`, `serde-support`
- * - `/` separates dependency feature refs: `lodash/clone`, `@scope/pkg/feature`
+ * - `:` separates dependency feature refs: `lodash:clone`, `@scope/pkg:feature`
  * - `dep:` prefix enables optional dependencies: `dep:tokio`
  */
 
@@ -45,6 +45,11 @@ export interface FeatureManifest {
    * The source file this manifest was loaded from.
    */
   readonly source?: ManifestSource;
+
+  /**
+   * Package dependencies (for validating dep: and pkg:feature references).
+   */
+  readonly dependencies?: PackageDependencies;
 }
 
 /**
@@ -74,6 +79,37 @@ export interface FeatureManifestMetadata {
 export interface RawFtFlagsConfig {
   readonly features: Record<string, string[]>;
   readonly metadata?: Record<string, FeatureManifestMetadata>;
+}
+
+/**
+ * Package dependency information for validation.
+ */
+export interface PackageDependencies {
+  /** Regular dependencies */
+  readonly dependencies?: Record<string, string>;
+  /** Optional dependencies (for dep: validation) */
+  readonly optionalDependencies?: Record<string, string>;
+  /** Peer dependencies */
+  readonly peerDependencies?: Record<string, string>;
+  /** Dev dependencies */
+  readonly devDependencies?: Record<string, string>;
+}
+
+/**
+ * Options for manifest validation.
+ */
+export interface ValidateOptions {
+  /**
+   * Package dependencies to validate dep: and pkg:feature references against.
+   * If not provided, external references are not validated.
+   */
+  readonly dependencies?: PackageDependencies;
+
+  /**
+   * Whether to treat unknown external dependencies as errors (default: false).
+   * When false, unknown deps generate warnings instead of errors.
+   */
+  readonly strictDependencies?: boolean;
 }
 
 /**
@@ -128,6 +164,22 @@ export interface ManifestValidation {
   readonly valid: boolean;
   readonly errors: readonly string[];
   readonly warnings: readonly string[];
+}
+
+/**
+ * Information about an external reference in the manifest.
+ */
+export interface ExternalReference {
+  /** The feature that contains this reference */
+  readonly feature: string;
+  /** The full reference string */
+  readonly reference: string;
+  /** Type of reference: dep: prefix or pkg:feature syntax */
+  readonly type: "dep" | "pkg-feature";
+  /** Package name being referenced */
+  readonly packageName: string;
+  /** Feature name (for pkg:feature refs) */
+  readonly featureName?: string;
 }
 
 // =============================================================================
@@ -185,10 +237,16 @@ export async function loadManifestFromDenoJson(
       metadata: featureMetadata,
     };
 
+    // Extract imports as dependencies for Deno
+    const imports = json.imports as Record<string, string> | undefined;
+    const deps: PackageDependencies | undefined = imports
+      ? { dependencies: Object.fromEntries(Object.keys(imports).map((k) => [k, "*"])) }
+      : undefined;
+
     return parseManifest(rawConfig, {
       type: "deno.json",
       path: configPath,
-    });
+    }, deps);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       return null;
@@ -251,10 +309,18 @@ export async function loadManifestFromPackageJson(
       metadata: featureMetadata,
     };
 
+    // Extract dependencies
+    const deps: PackageDependencies = {
+      dependencies: json.dependencies as Record<string, string> | undefined,
+      optionalDependencies: json.optionalDependencies as Record<string, string> | undefined,
+      peerDependencies: json.peerDependencies as Record<string, string> | undefined,
+      devDependencies: json.devDependencies as Record<string, string> | undefined,
+    };
+
     return parseManifest(rawConfig, {
       type: "package.json",
       path: configPath,
-    });
+    }, deps);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       return null;
@@ -293,11 +359,13 @@ export async function loadManifest(): Promise<FeatureManifest | null> {
  *
  * @param config - The raw configuration
  * @param source - Optional source information
+ * @param dependencies - Optional package dependencies for validation
  * @returns A parsed FeatureManifest
  */
 export function parseManifest(
   config: RawFtFlagsConfig,
   source?: ManifestSource,
+  dependencies?: PackageDependencies,
 ): FeatureManifest {
   const features = new Map<string, readonly string[]>();
   const metadata = new Map<string, FeatureManifestMetadata>();
@@ -318,6 +386,7 @@ export function parseManifest(
     features,
     metadata,
     source,
+    dependencies,
   };
 }
 
@@ -328,6 +397,7 @@ export function createEmptyManifest(): FeatureManifest {
   return {
     features: new Map(),
     metadata: new Map(),
+    dependencies: undefined,
   };
 }
 
@@ -357,6 +427,7 @@ export function createSimpleManifest(
   return {
     features,
     metadata: new Map(),
+    dependencies: undefined,
   };
 }
 
@@ -526,16 +597,144 @@ export function listDisabledFeatures(resolved: ResolvedFeatures): string[] {
 // =============================================================================
 
 /**
+ * Extracts all external references (dep: and pkg:feature) from a manifest.
+ *
+ * @param manifest - The manifest to analyze
+ * @returns Array of external references
+ */
+export function extractExternalReferences(
+  manifest: FeatureManifest,
+): ExternalReference[] {
+  const refs: ExternalReference[] = [];
+
+  for (const [feature, deps] of manifest.features) {
+    for (const dep of deps) {
+      if (dep.startsWith("dep:")) {
+        const packageName = dep.slice(4);
+        refs.push({
+          feature,
+          reference: dep,
+          type: "dep",
+          packageName,
+        });
+      } else if (isDepFeatureRef(dep)) {
+        const packageName = getDepPackage(dep);
+        const featureName = getDepFeature(dep);
+        if (packageName) {
+          refs.push({
+            feature,
+            reference: dep,
+            type: "pkg-feature",
+            packageName,
+            featureName,
+          });
+        }
+      }
+    }
+  }
+
+  return refs;
+}
+
+/**
+ * Gets all available dependencies from a PackageDependencies object.
+ */
+function getAllDependencyNames(deps: PackageDependencies): Set<string> {
+  const names = new Set<string>();
+
+  if (deps.dependencies) {
+    for (const name of Object.keys(deps.dependencies)) {
+      names.add(name);
+    }
+  }
+  if (deps.optionalDependencies) {
+    for (const name of Object.keys(deps.optionalDependencies)) {
+      names.add(name);
+    }
+  }
+  if (deps.peerDependencies) {
+    for (const name of Object.keys(deps.peerDependencies)) {
+      names.add(name);
+    }
+  }
+  if (deps.devDependencies) {
+    for (const name of Object.keys(deps.devDependencies)) {
+      names.add(name);
+    }
+  }
+
+  return names;
+}
+
+/**
+ * Validates a feature reference (dependency within a feature's activation list).
+ *
+ * @param ref - The reference string to validate
+ * @param featureName - The feature containing this reference
+ * @param allFeatures - Set of all local feature names
+ * @returns Error message if invalid, null if valid
+ */
+function validateFeatureReference(
+  ref: string,
+  featureName: string,
+  allFeatures: Set<string>,
+): string | null {
+  // dep: prefix for optional dependencies
+  if (ref.startsWith("dep:")) {
+    const depName = ref.slice(4);
+    if (!depName || depName.length === 0) {
+      return `Feature "${featureName}" has invalid dep: reference "${ref}": missing package name`;
+    }
+    if (!isValidPackageName(depName)) {
+      return `Feature "${featureName}" has invalid dep: reference "${ref}": "${depName}" is not a valid package name`;
+    }
+    return null; // Valid format (actual dep check is separate)
+  }
+
+  // Dependency feature reference (pkg:feature)
+  if (isDepFeatureRef(ref)) {
+    const pkg = getDepPackage(ref);
+    const feature = getDepFeature(ref);
+
+    if (!pkg) {
+      return `Feature "${featureName}" has invalid external reference "${ref}": missing package name`;
+    }
+    if (!feature) {
+      return `Feature "${featureName}" has invalid external reference "${ref}": missing feature name`;
+    }
+    if (!isValidPackageName(pkg)) {
+      return `Feature "${featureName}" has invalid external reference "${ref}": "${pkg}" is not a valid package name`;
+    }
+    if (!isValidFeatureId(feature)) {
+      return `Feature "${featureName}" has invalid external reference "${ref}": "${feature}" is not a valid feature name (must be kebab-case)`;
+    }
+    return null; // Valid format
+  }
+
+  // Local feature reference
+  if (!allFeatures.has(ref)) {
+    return `Feature "${featureName}" references unknown feature "${ref}"`;
+  }
+
+  return null;
+}
+
+/**
  * Validates a feature manifest.
  *
  * @param manifest - The manifest to validate
+ * @param options - Optional validation options
  * @returns Validation result with errors and warnings
  */
-export function validateManifest(manifest: FeatureManifest): ManifestValidation {
+export function validateManifest(
+  manifest: FeatureManifest,
+  options?: ValidateOptions,
+): ManifestValidation {
   const errors: string[] = [];
   const warnings: string[] = [];
 
   const allFeatures = new Set(manifest.features.keys());
+  const availableDeps = options?.dependencies ? getAllDependencyNames(options.dependencies) : null;
 
   // Validate each feature
   for (const [name, deps] of manifest.features) {
@@ -546,29 +745,17 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
       );
     }
 
-    // Check for unknown feature references
-    for (const dep of deps) {
-      // dep: prefix for optional dependencies - skip validation
-      if (dep.startsWith("dep:")) {
-        continue;
-      }
-
-      // Dependency feature reference (pkg/feature) - skip validation
-      // These reference features in other packages
-      if (isDepFeatureRef(dep)) {
-        continue;
-      }
-
-      if (!allFeatures.has(dep)) {
-        errors.push(
-          `Feature "${name}" references unknown feature "${dep}"`,
-        );
-      }
-    }
-
     // Check for self-reference
     if (deps.includes(name)) {
       errors.push(`Feature "${name}" references itself`);
+    }
+
+    // Validate each dependency reference
+    for (const dep of deps) {
+      const refError = validateFeatureReference(dep, name, allFeatures);
+      if (refError) {
+        errors.push(refError);
+      }
     }
   }
 
@@ -578,12 +765,26 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
     errors.push(`Circular dependency detected: ${cycle.join(" -> ")}`);
   }
 
+  // Validate external references against actual dependencies if provided
+  if (availableDeps) {
+    const externalRefs = extractExternalReferences(manifest);
+    for (const ref of externalRefs) {
+      if (!availableDeps.has(ref.packageName)) {
+        const message =
+          `Feature "${ref.feature}" references non-existent dependency "${ref.packageName}" via "${ref.reference}"`;
+        if (options?.strictDependencies) {
+          errors.push(message);
+        } else {
+          warnings.push(message);
+        }
+      }
+    }
+  }
+
   // Validate metadata references
   for (const name of manifest.metadata.keys()) {
     if (!allFeatures.has(name)) {
-      warnings.push(
-        `Metadata defined for unknown feature "${name}"`,
-      );
+      warnings.push(`Metadata defined for unknown feature "${name}"`);
     }
   }
 
@@ -603,6 +804,14 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
     );
   }
 
+  // Warn about empty default
+  const defaultDeps = manifest.features.get("default");
+  if (defaultDeps && defaultDeps.length === 0) {
+    warnings.push(
+      'The "default" feature enables no other features. Consider adding features to it.',
+    );
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -611,29 +820,24 @@ export function validateManifest(manifest: FeatureManifest): ManifestValidation 
 }
 
 /**
- * Validates a feature name.
+ * Validates a feature name (used for feature declarations, not references).
  * - "default" is always valid (special case)
  * - Regular features must be kebab-case
- * - Dependency refs (pkg/feature) are valid if both parts are kebab-case
- * - dep: prefix is valid
+ * - dep: and pkg:feature are NOT valid as feature names (only as references)
  */
 function isValidFeatureIdOrDefault(name: string): boolean {
   if (name === "default") {
     return true;
   }
 
-  // dep: prefix for optional dependencies
+  // dep: prefix is NOT valid for feature names - only for references
   if (name.startsWith("dep:")) {
-    const depName = name.slice(4);
-    return depName.length > 0 && isValidPackageName(depName);
+    return false;
   }
 
-  // Dependency feature reference: pkg/feature or @scope/pkg/feature
+  // pkg:feature is NOT valid for feature names - only for references
   if (isDepFeatureRef(name)) {
-    const pkg = getDepPackage(name);
-    const feature = getDepFeature(name);
-    if (!pkg || !feature) return false;
-    return isValidPackageName(pkg) && isValidFeatureId(feature);
+    return false;
   }
 
   return isValidFeatureId(name);
@@ -641,16 +845,54 @@ function isValidFeatureIdOrDefault(name: string): boolean {
 
 /**
  * Validates a package name (allows scoped packages like @scope/name).
+ *
+ * @param name - The package name to validate
+ * @returns True if the package name is valid
  */
-function isValidPackageName(name: string): boolean {
+export function isValidPackageName(name: string): boolean {
+  if (!name || name.length === 0) {
+    return false;
+  }
+
   // Scoped package: @scope/name
   if (name.startsWith("@")) {
     const parts = name.slice(1).split("/");
     if (parts.length !== 2) return false;
     return parts.every((p) => /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(p));
   }
-  // Regular package name
+
+  // Regular package name (kebab-case)
   return /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(name);
+}
+
+/**
+ * Validates a feature reference string format.
+ * This checks syntax only, not whether the referenced feature/package exists.
+ *
+ * @param ref - The reference to validate
+ * @returns True if the reference has valid format
+ */
+export function isValidFeatureReference(ref: string): boolean {
+  if (!ref || ref.length === 0) {
+    return false;
+  }
+
+  // dep: prefix
+  if (ref.startsWith("dep:")) {
+    const depName = ref.slice(4);
+    return isValidPackageName(depName);
+  }
+
+  // pkg:feature reference
+  if (isDepFeatureRef(ref)) {
+    const pkg = getDepPackage(ref);
+    const feature = getDepFeature(ref);
+    if (!pkg || !feature) return false;
+    return isValidPackageName(pkg) && isValidFeatureId(feature);
+  }
+
+  // Local feature reference or "default"
+  return ref === "default" || isValidFeatureId(ref);
 }
 
 /**

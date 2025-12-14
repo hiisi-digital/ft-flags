@@ -61,8 +61,10 @@ Features are declared at the root level of your `deno.json` or `package.json`. T
 Feature names follow Cargo conventions:
 
 - **Kebab-case**: Feature names use lowercase with hyphens: `async-runtime`, `serde-support`
-- **`/` for dependency features**: Enable features from dependencies: `lodash/clone`, `@scope/pkg/feature`
+- **`:` for dependency features**: Enable features from dependencies: `lodash:clone`, `@scope/pkg:feature`
 - **`dep:` for optional deps**: Enable optional dependencies: `dep:tokio`
+
+> **Note:** We use `:` instead of `/` (which Cargo uses) to avoid ambiguity with scoped package names like `@scope/pkg` that are common in the JS/TS ecosystem.
 
 ### Key Concepts
 
@@ -97,13 +99,13 @@ Enabling `full` will enable: `full`, `std`, `experimental`, `async-runtime`, `fs
 
 #### Dependency Features
 
-Enable features from your dependencies using `/`:
+Enable features from your dependencies using `:`:
 
 ```json
 {
   "features": {
-    "serialization": ["serde/derive", "@myorg/utils/json"],
-    "async": ["tokio/full"]
+    "serialization": ["serde:derive", "@myorg/utils:json"],
+    "async": ["tokio:full"]
   }
 }
 ```
@@ -468,16 +470,16 @@ export function modernStdLib(): void {
 
 ## Comparison with Cargo
 
-| Cargo                   | ft-flags                | Notes                  |
-| ----------------------- | ----------------------- | ---------------------- |
-| `[features]`            | `"features": {}`        | Same concept           |
-| `default = ["std"]`     | `"default": ["std"]`    | Same semantics         |
-| `foo = ["bar", "baz"]`  | `"foo": ["bar", "baz"]` | Feature enables others |
-| `dep:optional-dep`      | `"dep:pkg-name"`        | Optional dependency    |
-| `serde/derive`          | `"serde/derive"`        | Dep feature reference  |
-| `--features foo`        | `--features foo`        | CLI flag               |
-| `--no-default-features` | `--no-default-features` | Disable defaults       |
-| `--all-features`        | `--all-features`        | Enable everything      |
+| Cargo                   | ft-flags                | Notes                                |
+| ----------------------- | ----------------------- | ------------------------------------ |
+| `[features]`            | `"features": {}`        | Same concept                         |
+| `default = ["std"]`     | `"default": ["std"]`    | Same semantics                       |
+| `foo = ["bar", "baz"]`  | `"foo": ["bar", "baz"]` | Feature enables others               |
+| `dep:optional-dep`      | `"dep:pkg-name"`        | Optional dependency                  |
+| `serde/derive`          | `"serde:derive"`        | Dep feature ref (`:` instead of `/`) |
+| `--features foo`        | `--features foo`        | CLI flag                             |
+| `--no-default-features` | `--no-default-features` | Disable defaults                     |
+| `--all-features`        | `--all-features`        | Enable everything                    |
 
 ## Related Packages
 

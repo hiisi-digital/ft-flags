@@ -68,7 +68,9 @@
     "check": "deno check mod.ts",
     "all": "deno task fmt && deno task lint && deno task check && deno task test",
     "prepublish": "deno task all",
-    "ft": "deno run --allow-read --allow-env src/cli.ts"
+    "ft": "deno run --allow-read --allow-env src/cli.ts",
+    "build:npm": "deno run -A scripts/build_npm.ts",
+    "publish:npm": "cd npm && npm publish"
   },
   "publish": {
     "include": [
@@ -81,7 +83,8 @@
     "exclude": [
       "tests/",
       "scripts/",
-      ".githooks/"
+      ".githooks/",
+      "npm/"
     ]
   }
 }

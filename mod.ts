@@ -91,14 +91,17 @@ export {
 // =============================================================================
 
 export type {
+  ExternalReference,
   FeatureManifest,
   FeatureManifestMetadata,
   FeatureTreeNode,
   ManifestSource,
   ManifestValidation,
+  PackageDependencies,
   RawFtFlagsConfig,
   ResolvedFeatures,
   ResolveOptions,
+  ValidateOptions,
 } from "./src/manifest.ts";
 
 export {
@@ -106,8 +109,11 @@ export {
   createEmptyManifest,
   createSimpleManifest,
   detectCycles,
+  extractExternalReferences,
   getEnableChain,
   isFeatureEnabled,
+  isValidFeatureReference,
+  isValidPackageName,
   listAvailableFeatures,
   listDisabledFeatures as listManifestDisabledFeatures,
   listEnabledFeatures as listManifestEnabledFeatures,

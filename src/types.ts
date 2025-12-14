@@ -16,7 +16,7 @@ export type FeatureId = string & { readonly __brand: unique symbol };
 /**
  * Regex pattern for valid feature IDs.
  * Must be lowercase alphanumeric with hyphens (kebab-case), following Cargo conventions.
- * The `/` separator is reserved for dependency feature references (e.g., "dep-name/feature").
+ * The `:` separator is reserved for dependency feature references (e.g., "dep-name:feature").
  */
 const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
@@ -80,21 +80,36 @@ export function unsafeFeatureId(id: string): FeatureId {
  * Gets the package name from a dependency feature reference.
  * Returns undefined if this is not a dependency feature reference.
  *
- * Dependency feature references use the format: "package-name/feature-name"
+ * Dependency feature references use the format: "package-name:feature-name"
+ * For scoped packages: "@scope/package-name:feature-name"
+ *
+ * The `:` delimiter is used instead of `/` to avoid ambiguity with scoped
+ * package names (e.g., `@scope/pkg`), which are common in the JS/TS ecosystem.
  *
  * @param id - The feature reference to parse
  * @returns The package name, or undefined if not a dep reference
  *
  * @example
- * getDepPackage("lodash/clone") // returns "lodash"
+ * getDepPackage("lodash:clone") // returns "lodash"
+ * getDepPackage("@scope/pkg:feature") // returns "@scope/pkg"
  * getDepPackage("async-runtime") // returns undefined
  */
 export function getDepPackage(id: string): string | undefined {
-  const slashIndex = id.indexOf("/");
-  if (slashIndex === -1) {
+  // Find the colon separator - it separates package from feature
+  const colonIndex = id.indexOf(":");
+
+  // No colon means no feature reference
+  if (colonIndex === -1) {
     return undefined;
   }
-  return id.slice(0, slashIndex);
+
+  // dep: prefix is handled separately, not a pkg:feature reference
+  if (id.startsWith("dep:")) {
+    return undefined;
+  }
+
+  // Everything before the colon is the package name
+  return id.slice(0, colonIndex);
 }
 
 /**
@@ -105,29 +120,52 @@ export function getDepPackage(id: string): string | undefined {
  * @returns The feature name portion
  *
  * @example
- * getDepFeature("lodash/clone") // returns "clone"
+ * getDepFeature("lodash:clone") // returns "clone"
+ * getDepFeature("@scope/pkg:feature") // returns "feature"
  * getDepFeature("async-runtime") // returns "async-runtime"
  */
 export function getDepFeature(id: string): string {
-  const slashIndex = id.indexOf("/");
-  if (slashIndex === -1) {
+  // dep: prefix is handled separately
+  if (id.startsWith("dep:")) {
     return id;
   }
-  return id.slice(slashIndex + 1);
+
+  // Find the colon separator
+  const colonIndex = id.indexOf(":");
+
+  // No colon means this is just a local feature reference
+  if (colonIndex === -1) {
+    return id;
+  }
+
+  // Everything after the colon is the feature name
+  return id.slice(colonIndex + 1);
 }
 
 /**
  * Checks if a feature reference is a dependency feature reference.
  *
+ * Uses `:` as the delimiter between package and feature to avoid
+ * ambiguity with scoped package names (e.g., `@scope/pkg`).
+ *
  * @param id - The feature reference to check
  * @returns True if this references a feature in a dependency
  *
  * @example
- * isDepFeatureRef("lodash/clone") // returns true
+ * isDepFeatureRef("lodash:clone") // returns true
+ * isDepFeatureRef("@scope/pkg:feature") // returns true
+ * isDepFeatureRef("@scope/pkg") // returns false (just a scoped package, no feature)
  * isDepFeatureRef("async-runtime") // returns false
+ * isDepFeatureRef("dep:tokio") // returns false (dep: prefix is different)
  */
 export function isDepFeatureRef(id: string): boolean {
-  return id.includes("/");
+  // dep: prefix is a different kind of reference
+  if (id.startsWith("dep:")) {
+    return false;
+  }
+
+  // Look for colon - that's the pkg:feature separator
+  return id.includes(":");
 }
 
 // =============================================================================

@@ -527,15 +527,15 @@ describe("buildFeatureTree", () => {
     const manifest = parseManifest({
       features: {
         default: [],
-        serialization: ["serde/derive"],
-        async: ["tokio/full", "dep:async-hooks"],
+        serialization: ["serde:derive"],
+        async: ["tokio:full", "dep:async-hooks"],
       },
     });
 
     const result = validateManifest(manifest);
     // Should not error on dep refs or dep: prefixes
-    assertEquals(result.errors.filter((e) => e.includes("serde/derive")).length, 0);
-    assertEquals(result.errors.filter((e) => e.includes("tokio/full")).length, 0);
+    assertEquals(result.errors.filter((e) => e.includes("serde:derive")).length, 0);
+    assertEquals(result.errors.filter((e) => e.includes("tokio:full")).length, 0);
     assertEquals(result.errors.filter((e) => e.includes("dep:async-hooks")).length, 0);
   });
 

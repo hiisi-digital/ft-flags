@@ -129,22 +129,24 @@ function parseArgs(args: string[]): ParsedArgs {
 }
 
 function getResolveOptions(flags: Record<string, string | boolean>): ResolveOptions {
-  const options: ResolveOptions = {};
+  let features: string[] | undefined;
+  let noDefaultFeatures: boolean | undefined;
+  let allFeatures: boolean | undefined;
 
   if (flags.features) {
     const featuresStr = String(flags.features);
-    options.features = featuresStr.split(",").map((s) => s.trim()).filter(Boolean);
+    features = featuresStr.split(",").map((s) => s.trim()).filter(Boolean);
   }
 
   if (flags["no-default-features"]) {
-    options.noDefaultFeatures = true;
+    noDefaultFeatures = true;
   }
 
   if (flags["all-features"]) {
-    options.allFeatures = true;
+    allFeatures = true;
   }
 
-  return options;
+  return { features, noDefaultFeatures, allFeatures };
 }
 
 // =============================================================================
@@ -333,7 +335,10 @@ function cmdTree(
 }
 
 function cmdValidate(manifest: FeatureManifest): number {
-  const result = validateManifest(manifest);
+  // Pass dependencies from the manifest for external reference validation
+  const result = validateManifest(manifest, {
+    dependencies: manifest.dependencies,
+  });
 
   if (result.valid && result.warnings.length === 0) {
     console.log(success("Configuration is valid"));

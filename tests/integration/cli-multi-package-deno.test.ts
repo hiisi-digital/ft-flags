@@ -95,7 +95,7 @@ const testPackages: TestPackage[] = [
       },
     },
   },
-  // Package E: Cross-package references (dep: and pkg/feature)
+  // Package E: Cross-package references (dep: and pkg:feature)
   {
     name: "pkg-e",
     config: {
@@ -103,9 +103,9 @@ const testPackages: TestPackage[] = [
       version: "3.0.0",
       features: {
         default: ["serialization"],
-        serialization: ["serde/derive"],
-        async: ["dep:tokio", "tokio/full"],
-        networking: ["async", "reqwest/json"],
+        serialization: ["serde:derive"],
+        async: ["dep:tokio", "tokio:full"],
+        networking: ["async", "reqwest:json"],
       },
     },
   },
@@ -321,7 +321,7 @@ describe("CLI Multi-Package Integration (deno.json)", () => {
   });
 
   describe("Package E: Cross-package references", () => {
-    it("should validate with dep: and pkg/feature references", async () => {
+    it("should validate with dep: and pkg:feature references", async () => {
       const result = await runCli(`${tempDir}/pkg-e`, ["validate"]);
       assertEquals(result.code, 0);
       assertStringIncludes(result.output, "valid");
