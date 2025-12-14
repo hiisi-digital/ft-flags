@@ -7,124 +7,456 @@
  * @module
  */
 
-import type { FeatureDefinition, FeatureId, FeatureSchema, FeatureState } from "./types.ts";
-
-/**
- * Registry holding all features and their states
- */
-export interface FeatureRegistry {
-  readonly features: Map<FeatureId, FeatureDefinition>;
-  readonly states: Map<FeatureId, FeatureState>;
-}
+import { buildSchema, createEmptySchema, getDescendantFeatureIds } from "./schema.ts";
+import {
+    type FeatureConfig,
+    type FeatureDefinition,
+    type FeatureId,
+    type FeatureRegistry,
+    type FeatureSchema,
+    type FeatureState,
+    type FeatureStateReason,
+    type ResolvedConfig,
+    featureId,
+    FeatureNotFoundError,
+    getAncestorFeatureIds
+} from "./types.ts";
 
 /**
  * Options for creating a feature registry
  */
 export interface CreateRegistryOptions {
-  /** Feature schemas to register */
-  schemas?: FeatureSchema[];
-  /** Features to enable by default */
-  enabled?: FeatureId[];
-  /** Features to disable by default */
-  disabled?: FeatureId[];
+  /** Feature schema to use */
+  readonly schema?: FeatureSchema;
+  /** Feature configuration */
+  readonly config?: FeatureConfig;
+  /** Source of the configuration */
+  readonly configSource?: ResolvedConfig["source"];
 }
 
 /**
- * Creates a new feature registry
+ * Creates a new feature registry from a schema and configuration.
  *
- * TODO: Implement registry creation
- * - Initialize empty maps for features and states
- * - Register all provided schemas
- * - Apply enabled/disabled lists
- * - Expand hierarchical features (if parent enabled, children should inherit)
+ * @param options - Registry creation options
+ * @returns A new FeatureRegistry
  */
-export function createRegistry(_options?: CreateRegistryOptions): FeatureRegistry {
-  // TODO: Implement
-  throw new Error("Not implemented: createRegistry");
+export function createRegistry(options?: CreateRegistryOptions): FeatureRegistry {
+  const schema = options?.schema ?? createEmptySchema();
+  const config = options?.config ?? {};
+  const configSource = options?.configSource ?? { type: "programmatic" as const };
+
+  const states = new Map<FeatureId, FeatureState>();
+
+  // Initialize all features to their default states
+  for (const [id, definition] of schema.features) {
+    states.set(id, computeInitialState(definition, config, schema));
+  }
+
+  // Apply explicit enables (with cascade)
+  if (config.enabled) {
+    for (const idStr of config.enabled) {
+      try {
+        const id = featureId(idStr);
+        applyEnable(id, states, schema, configSource, "explicit-enabled");
+      } catch {
+        // Skip invalid feature IDs
+      }
+    }
+  }
+
+  // Apply explicit disables (overrides enables, with cascade)
+  if (config.disabled) {
+    for (const idStr of config.disabled) {
+      try {
+        const id = featureId(idStr);
+        applyDisable(id, states, schema, configSource, "explicit-disabled");
+      } catch {
+        // Skip invalid feature IDs
+      }
+    }
+  }
+
+  return {
+    schema,
+    states,
+    config: {
+      config,
+      source: configSource,
+    },
+  };
 }
 
 /**
- * Registers a feature schema in the registry
- *
- * TODO: Implement schema registration
- * - Validate schema structure
- * - Add to features map
- * - Set initial state (default disabled unless specified)
- * - Register child features recursively
+ * Computes the initial state for a feature based on defaults and config.
  */
-export function registerFeature(
-  _registry: FeatureRegistry,
-  _schema: FeatureSchema,
-): FeatureRegistry {
-  // TODO: Implement
-  throw new Error("Not implemented: registerFeature");
+function computeInitialState(
+  definition: FeatureDefinition,
+  config: FeatureConfig,
+  _schema: FeatureSchema
+): FeatureState {
+  // Check enableAll/disableAll first
+  if (config.enableAll) {
+    return {
+      enabled: true,
+      reason: "enable-all",
+    };
+  }
+
+  if (config.disableAll) {
+    return {
+      enabled: false,
+      reason: "disable-all",
+    };
+  }
+
+  // Check default from definition
+  if (definition.defaultEnabled) {
+    return {
+      enabled: true,
+      reason: "default-enabled",
+    };
+  }
+
+  return {
+    enabled: false,
+    reason: "default-disabled",
+  };
 }
 
 /**
- * Gets a feature definition from the registry
+ * Applies an enable to a feature and optionally cascades to children.
+ */
+function applyEnable(
+  id: FeatureId,
+  states: Map<FeatureId, FeatureState>,
+  schema: FeatureSchema,
+  source: ResolvedConfig["source"],
+  reason: FeatureStateReason
+): void {
+  const definition = schema.features.get(id);
+
+  // Set the feature state
+  states.set(id, {
+    enabled: true,
+    reason,
+    source,
+  });
+
+  // Cascade to children if configured
+  if (definition?.cascadeToChildren !== false) {
+    const descendants = getDescendantFeatureIds(schema, id);
+    for (const childId of descendants) {
+      // Only cascade if not already explicitly set
+      const currentState = states.get(childId);
+      if (
+        !currentState ||
+        currentState.reason === "default-disabled" ||
+        currentState.reason === "default-enabled"
+      ) {
+        states.set(childId, {
+          enabled: true,
+          reason: "parent-enabled",
+          source,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * Applies a disable to a feature and optionally cascades to children.
+ */
+function applyDisable(
+  id: FeatureId,
+  states: Map<FeatureId, FeatureState>,
+  schema: FeatureSchema,
+  source: ResolvedConfig["source"],
+  reason: FeatureStateReason
+): void {
+  // Set the feature state
+  states.set(id, {
+    enabled: false,
+    reason,
+    source,
+  });
+
+  // Cascade disable to children
+  const descendants = getDescendantFeatureIds(schema, id);
+  for (const childId of descendants) {
+    states.set(childId, {
+      enabled: false,
+      reason: "parent-disabled",
+      source,
+    });
+  }
+}
+
+/**
+ * Gets a feature definition from the registry's schema.
  *
- * TODO: Implement feature lookup
- * - Return undefined if not found
- * - Support dot-notation lookup (e.g., "shimp.fs")
+ * @param registry - The feature registry
+ * @param id - The feature ID to look up
+ * @returns The feature definition, or undefined if not found
  */
 export function getFeature(
-  _registry: FeatureRegistry,
-  _id: FeatureId,
+  registry: FeatureRegistry,
+  id: FeatureId
 ): FeatureDefinition | undefined {
-  // TODO: Implement
-  throw new Error("Not implemented: getFeature");
+  return registry.schema.features.get(id);
 }
 
 /**
- * Gets the current state of a feature
+ * Gets the current state of a feature.
  *
- * TODO: Implement state lookup
- * - Return undefined if feature not registered
- * - Check parent feature state if applicable
+ * @param registry - The feature registry
+ * @param id - The feature ID to look up
+ * @returns The feature state, or undefined if not registered
  */
 export function getFeatureState(
-  _registry: FeatureRegistry,
-  _id: FeatureId,
+  registry: FeatureRegistry,
+  id: FeatureId
 ): FeatureState | undefined {
-  // TODO: Implement
-  throw new Error("Not implemented: getFeatureState");
+  return registry.states.get(id);
 }
 
 /**
- * Sets the state of a feature
+ * Checks if a feature is enabled.
  *
- * TODO: Implement state setting
- * - Update the state in the registry
- * - Optionally propagate to children (if enabling parent)
+ * If the feature is not in the registry, this function checks if any
+ * ancestor feature is enabled (hierarchical lookup).
+ *
+ * @param registry - The feature registry
+ * @param id - The feature ID to check
+ * @returns True if the feature is enabled
+ */
+export function isEnabled(registry: FeatureRegistry, id: FeatureId): boolean {
+  // Direct lookup
+  const state = registry.states.get(id);
+  if (state) {
+    return state.enabled;
+  }
+
+  // Check if any ancestor is enabled (for features not explicitly in schema)
+  const ancestors = getAncestorFeatureIds(id);
+  for (const ancestorId of ancestors) {
+    const ancestorState = registry.states.get(ancestorId);
+    if (ancestorState?.enabled) {
+      // Check if the ancestor cascades to children
+      const ancestorDef = registry.schema.features.get(ancestorId);
+      if (ancestorDef?.cascadeToChildren !== false) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a feature is disabled.
+ *
+ * @param registry - The feature registry
+ * @param id - The feature ID to check
+ * @returns True if the feature is disabled
+ */
+export function isDisabled(registry: FeatureRegistry, id: FeatureId): boolean {
+  return !isEnabled(registry, id);
+}
+
+/**
+ * Requires a feature to be enabled, throwing if it's not.
+ *
+ * @param registry - The feature registry
+ * @param id - The feature ID to require
+ * @throws FeatureNotEnabledError if the feature is not enabled
+ */
+export function requireFeature(registry: FeatureRegistry, id: FeatureId): void {
+  if (!isEnabled(registry, id)) {
+    const state = registry.states.get(id) ?? {
+      enabled: false,
+      reason: "default-disabled" as const,
+    };
+
+    throw new FeatureNotFoundError(id as string);
+  }
+}
+
+/**
+ * Sets the state of a feature, returning a new registry.
+ * This is an immutable operation.
+ *
+ * @param registry - The current registry
+ * @param id - The feature ID to update
+ * @param enabled - Whether the feature should be enabled
+ * @returns A new registry with the updated state
  */
 export function setFeatureState(
-  _registry: FeatureRegistry,
-  _id: FeatureId,
-  _state: FeatureState,
+  registry: FeatureRegistry,
+  id: FeatureId,
+  enabled: boolean
 ): FeatureRegistry {
-  // TODO: Implement
-  throw new Error("Not implemented: setFeatureState");
+  const newStates = new Map(registry.states);
+
+  const reason: FeatureStateReason = enabled ? "explicit-enabled" : "explicit-disabled";
+
+  if (enabled) {
+    applyEnable(id, newStates, registry.schema, { type: "programmatic" }, reason);
+  } else {
+    applyDisable(id, newStates, registry.schema, { type: "programmatic" }, reason);
+  }
+
+  return {
+    schema: registry.schema,
+    states: newStates,
+    config: registry.config,
+  };
 }
 
 /**
- * Lists all registered feature IDs
+ * Enables a feature, returning a new registry.
  *
- * TODO: Implement listing
- * - Return array of all feature IDs
- * - Optionally filter by enabled/disabled state
+ * @param registry - The current registry
+ * @param id - The feature ID to enable
+ * @returns A new registry with the feature enabled
  */
-export function listFeatures(_registry: FeatureRegistry): FeatureId[] {
-  // TODO: Implement
-  throw new Error("Not implemented: listFeatures");
+export function enableFeature(registry: FeatureRegistry, id: FeatureId): FeatureRegistry {
+  return setFeatureState(registry, id, true);
 }
 
 /**
- * Clones a registry (for immutable updates)
+ * Disables a feature, returning a new registry.
  *
- * TODO: Implement cloning
- * - Deep copy features and states maps
+ * @param registry - The current registry
+ * @param id - The feature ID to disable
+ * @returns A new registry with the feature disabled
  */
-export function cloneRegistry(_registry: FeatureRegistry): FeatureRegistry {
-  // TODO: Implement
-  throw new Error("Not implemented: cloneRegistry");
+export function disableFeature(registry: FeatureRegistry, id: FeatureId): FeatureRegistry {
+  return setFeatureState(registry, id, false);
+}
+
+/**
+ * Lists all registered feature IDs.
+ *
+ * @param registry - The feature registry
+ * @returns Array of all feature IDs
+ */
+export function listFeatures(registry: FeatureRegistry): FeatureId[] {
+  return [...registry.schema.features.keys()];
+}
+
+/**
+ * Lists all enabled feature IDs.
+ *
+ * @param registry - The feature registry
+ * @returns Array of enabled feature IDs
+ */
+export function listEnabledFeatures(registry: FeatureRegistry): FeatureId[] {
+  const enabled: FeatureId[] = [];
+  for (const [id, state] of registry.states) {
+    if (state.enabled) {
+      enabled.push(id);
+    }
+  }
+  return enabled;
+}
+
+/**
+ * Lists all disabled feature IDs.
+ *
+ * @param registry - The feature registry
+ * @returns Array of disabled feature IDs
+ */
+export function listDisabledFeatures(registry: FeatureRegistry): FeatureId[] {
+  const disabled: FeatureId[] = [];
+  for (const [id, state] of registry.states) {
+    if (!state.enabled) {
+      disabled.push(id);
+    }
+  }
+  return disabled;
+}
+
+/**
+ * Clones a registry.
+ *
+ * @param registry - The registry to clone
+ * @returns A new registry with the same state
+ */
+export function cloneRegistry(registry: FeatureRegistry): FeatureRegistry {
+  return {
+    schema: registry.schema,
+    states: new Map(registry.states),
+    config: registry.config,
+  };
+}
+
+/**
+ * Creates a registry with features enabled based on a set of IDs.
+ *
+ * @param featureIds - Array of feature ID strings to enable
+ * @returns A new registry with those features enabled
+ */
+export function createSimpleRegistry(featureIds: string[]): FeatureRegistry {
+  // Create definitions for each feature
+  const definitions = featureIds.map((id) => ({ id }));
+
+  // Build schema
+  const schema = buildSchema(definitions);
+
+  // Create registry with all features enabled
+  return createRegistry({
+    schema,
+    config: {
+      enabled: featureIds,
+    },
+  });
+}
+
+/**
+ * Merges two registries together.
+ * The override registry's state takes precedence.
+ *
+ * @param base - The base registry
+ * @param override - The registry to merge on top
+ * @returns A new merged registry
+ */
+export function mergeRegistries(
+  base: FeatureRegistry,
+  override: FeatureRegistry
+): FeatureRegistry {
+  // Merge schemas (override takes precedence for same IDs)
+  const allFeatures = new Map<FeatureId, FeatureDefinition>();
+  for (const [id, def] of base.schema.features) {
+    allFeatures.set(id, def);
+  }
+  for (const [id, def] of override.schema.features) {
+    allFeatures.set(id, def);
+  }
+
+  // Rebuild schema from merged features
+  const definitions = [...allFeatures.values()].map((def) => ({
+    id: def.id as string,
+    name: def.name,
+    description: def.description,
+    cascadeToChildren: def.cascadeToChildren,
+    defaultEnabled: def.defaultEnabled,
+    metadata: def.metadata,
+  }));
+
+  const schema = buildSchema(definitions);
+
+  // Merge states (override takes precedence)
+  const states = new Map<FeatureId, FeatureState>();
+  for (const [id, state] of base.states) {
+    states.set(id, state);
+  }
+  for (const [id, state] of override.states) {
+    states.set(id, state);
+  }
+
+  return {
+    schema,
+    states,
+    config: override.config,
+  };
 }

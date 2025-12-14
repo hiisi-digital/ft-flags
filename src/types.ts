@@ -14,12 +14,156 @@
 export type FeatureId = string & { readonly __brand: unique symbol };
 
 /**
+ * Regex pattern for valid feature IDs.
+ * Must be lowercase alphanumeric with dots and hyphens, no leading/trailing dots.
+ */
+const FEATURE_ID_PATTERN = /^[a-z][a-z0-9]*(?:[-.]?[a-z0-9]+)*$/;
+
+/**
+ * Validates that a string is a valid feature ID format.
+ *
+ * @param id - The string to validate
+ * @returns True if the string is a valid feature ID format
+ */
+export function isValidFeatureId(id: string): boolean {
+  if (!id || id.length === 0) {
+    return false;
+  }
+  // Check for leading/trailing dots or hyphens
+  if (id.startsWith(".") || id.endsWith(".") || id.startsWith("-") || id.endsWith("-")) {
+    return false;
+  }
+  // Check for consecutive dots or mixed dot-hyphen
+  if (id.includes("..") || id.includes(".-") || id.includes("-.")) {
+    return false;
+  }
+  return FEATURE_ID_PATTERN.test(id);
+}
+
+/**
  * Creates a branded FeatureId from a string.
- * TODO: Add validation for proper dot-notation format
+ * Validates the format and throws if invalid.
+ *
+ * @param id - The string to convert to a FeatureId
+ * @returns A branded FeatureId
+ * @throws Error if the format is invalid
  */
 export function featureId(id: string): FeatureId {
-  // TODO: Validate format (e.g., must contain only alphanumeric and dots, no leading/trailing dots)
+  if (!isValidFeatureId(id)) {
+    throw new FeatureIdFormatError(
+      id,
+      "Feature ID must be lowercase alphanumeric with dots for hierarchy (e.g., 'shimp.fs')"
+    );
+  }
   return id as FeatureId;
+}
+
+/**
+ * Creates a FeatureId without validation.
+ * Use only when you're certain the ID is valid (e.g., from trusted internal sources).
+ *
+ * @param id - The string to convert to a FeatureId
+ * @returns A branded FeatureId
+ */
+export function unsafeFeatureId(id: string): FeatureId {
+  return id as FeatureId;
+}
+
+/**
+ * Gets the parent feature ID from a hierarchical feature ID.
+ * Returns undefined if the feature has no parent (is a root feature).
+ *
+ * @param id - The feature ID to get the parent of
+ * @returns The parent feature ID, or undefined if no parent
+ *
+ * @example
+ * getParentFeatureId(featureId("shimp.fs.read")) // returns "shimp.fs"
+ * getParentFeatureId(featureId("shimp")) // returns undefined
+ */
+export function getParentFeatureId(id: FeatureId): FeatureId | undefined {
+  const lastDotIndex = (id as string).lastIndexOf(".");
+  if (lastDotIndex === -1) {
+    return undefined;
+  }
+  return (id as string).slice(0, lastDotIndex) as FeatureId;
+}
+
+/**
+ * Gets all ancestor feature IDs from a hierarchical feature ID.
+ * Returns an array from immediate parent to root.
+ *
+ * @param id - The feature ID to get ancestors of
+ * @returns Array of ancestor feature IDs, from immediate parent to root
+ *
+ * @example
+ * getAncestorFeatureIds(featureId("shimp.fs.read")) // returns ["shimp.fs", "shimp"]
+ */
+export function getAncestorFeatureIds(id: FeatureId): FeatureId[] {
+  const ancestors: FeatureId[] = [];
+  let current = getParentFeatureId(id);
+  while (current !== undefined) {
+    ancestors.push(current);
+    current = getParentFeatureId(current);
+  }
+  return ancestors;
+}
+
+/**
+ * Gets the depth/level of a feature ID in the hierarchy.
+ * Root features have depth 0.
+ *
+ * @param id - The feature ID
+ * @returns The depth (number of dots in the ID)
+ *
+ * @example
+ * getFeatureDepth(featureId("shimp")) // returns 0
+ * getFeatureDepth(featureId("shimp.fs")) // returns 1
+ * getFeatureDepth(featureId("shimp.fs.read")) // returns 2
+ */
+export function getFeatureDepth(id: FeatureId): number {
+  const str = id as string;
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === ".") {
+      count++;
+    }
+  }
+  return count;
+}
+
+/**
+ * Checks if one feature ID is an ancestor of another.
+ *
+ * @param ancestor - The potential ancestor feature ID
+ * @param descendant - The potential descendant feature ID
+ * @returns True if ancestor is an ancestor of descendant
+ *
+ * @example
+ * isAncestorOf(featureId("shimp"), featureId("shimp.fs")) // returns true
+ * isAncestorOf(featureId("shimp.fs"), featureId("shimp")) // returns false
+ */
+export function isAncestorOf(ancestor: FeatureId, descendant: FeatureId): boolean {
+  const ancestorStr = ancestor as string;
+  const descendantStr = descendant as string;
+
+  // Ancestor must be shorter
+  if (ancestorStr.length >= descendantStr.length) {
+    return false;
+  }
+
+  // Descendant must start with ancestor followed by a dot
+  return descendantStr.startsWith(ancestorStr + ".");
+}
+
+/**
+ * Checks if one feature ID is a descendant of another.
+ *
+ * @param descendant - The potential descendant feature ID
+ * @param ancestor - The potential ancestor feature ID
+ * @returns True if descendant is a descendant of ancestor
+ */
+export function isDescendantOf(descendant: FeatureId, ancestor: FeatureId): boolean {
+  return isAncestorOf(ancestor, descendant);
 }
 
 // =============================================================================
@@ -50,11 +194,31 @@ export interface FeatureMetadata {
 export interface FeatureDefinition {
   /** Unique identifier for this feature */
   readonly id: FeatureId;
-  /** Parent feature ID (for hierarchical features) */
+  /** Human-readable name for the feature */
+  readonly name?: string;
+  /** Human-readable description of the feature */
+  readonly description?: string;
+  /** Parent feature ID (for hierarchical features) - computed from id if not specified */
   readonly parent?: FeatureId;
-  /** Child feature IDs (computed from parent relationships) */
-  readonly children?: readonly FeatureId[];
   /** Whether enabling parent automatically enables children */
+  readonly cascadeToChildren?: boolean;
+  /** Whether this feature is enabled by default */
+  readonly defaultEnabled?: boolean;
+  /** Feature metadata */
+  readonly metadata?: FeatureMetadata;
+}
+
+/**
+ * Input for defining a feature (before parent is computed).
+ */
+export interface FeatureDefinitionInput {
+  /** Unique identifier for this feature */
+  readonly id: string;
+  /** Human-readable name for the feature */
+  readonly name?: string;
+  /** Human-readable description of the feature */
+  readonly description?: string;
+  /** Whether enabling parent automatically enables children (default: true) */
   readonly cascadeToChildren?: boolean;
   /** Whether this feature is enabled by default */
   readonly defaultEnabled?: boolean;
@@ -70,6 +234,8 @@ export interface FeatureSchema {
   readonly features: ReadonlyMap<FeatureId, FeatureDefinition>;
   /** Root features (those without parents) */
   readonly roots: readonly FeatureId[];
+  /** Map of parent to children */
+  readonly children: ReadonlyMap<FeatureId, readonly FeatureId[]>;
 }
 
 // =============================================================================
@@ -139,7 +305,6 @@ export type FeatureStateReason =
 
 /**
  * A runtime registry of features and their current states.
- * TODO: Implement as an immutable registry with efficient lookups
  */
 export interface FeatureRegistry {
   /** The schema this registry is based on */
@@ -163,10 +328,37 @@ export interface FeatureCheckResult {
   readonly state: FeatureState;
 }
 
+// =============================================================================
+// Error Types
+// =============================================================================
+
+/**
+ * Base error class for feature flag errors.
+ */
+export class FeatureFlagError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FeatureFlagError";
+  }
+}
+
+/**
+ * Error thrown when a feature ID format is invalid.
+ */
+export class FeatureIdFormatError extends FeatureFlagError {
+  readonly invalidId: string;
+
+  constructor(invalidId: string, reason?: string) {
+    super(`Invalid feature ID "${invalidId}"${reason ? `: ${reason}` : ""}`);
+    this.name = "FeatureIdFormatError";
+    this.invalidId = invalidId;
+  }
+}
+
 /**
  * Error thrown when a required feature is not enabled.
  */
-export class FeatureNotEnabledError extends Error {
+export class FeatureNotEnabledError extends FeatureFlagError {
   readonly featureId: FeatureId;
   readonly state: FeatureState;
 
@@ -181,12 +373,35 @@ export class FeatureNotEnabledError extends Error {
 /**
  * Error thrown when a feature ID is not found in the schema.
  */
-export class FeatureNotFoundError extends Error {
+export class FeatureNotFoundError extends FeatureFlagError {
   readonly featureId: string;
 
   constructor(featureId: string) {
     super(`Feature "${featureId}" is not defined in the schema`);
     this.name = "FeatureNotFoundError";
     this.featureId = featureId;
+  }
+}
+
+/**
+ * Error thrown when feature schema validation fails.
+ */
+export class FeatureSchemaError extends FeatureFlagError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FeatureSchemaError";
+  }
+}
+
+/**
+ * Error thrown when configuration loading fails.
+ */
+export class ConfigLoadError extends FeatureFlagError {
+  readonly source?: string;
+
+  constructor(message: string, source?: string) {
+    super(message);
+    this.name = "ConfigLoadError";
+    this.source = source;
   }
 }

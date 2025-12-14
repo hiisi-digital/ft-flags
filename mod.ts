@@ -7,12 +7,24 @@
  *
  * @example
  * ```ts
- * import { createRegistry, isEnabled, featureId } from "@hiisi/ft-flags";
+ * import { createRegistry, isEnabled, featureId, buildSchema } from "@hiisi/ft-flags";
  *
+ * // Define features
+ * const schema = buildSchema([
+ *   { id: "shimp" },
+ *   { id: "shimp.fs", description: "File system access" },
+ *   { id: "shimp.env", description: "Environment variable access" },
+ * ]);
+ *
+ * // Create registry with enabled features
  * const registry = createRegistry({
- *   enabled: [featureId("shimp.fs"), featureId("shimp.env")],
+ *   schema,
+ *   config: {
+ *     enabled: ["shimp.fs", "shimp.env"],
+ *   },
  * });
  *
+ * // Check if features are enabled
  * if (isEnabled(featureId("shimp.fs"), registry)) {
  *   // Use filesystem features
  * }
@@ -28,6 +40,8 @@ export type {
     FeatureCheckResult,
     FeatureConfig,
     FeatureDefinition,
+    FeatureDefinitionInput,
+    FeatureId,
     FeatureMetadata,
     FeatureRegistry,
     FeatureSchema,
@@ -36,32 +50,38 @@ export type {
     ResolvedConfig
 } from "./src/types.ts";
 
-export { featureId, FeatureNotEnabledError, FeatureNotFoundError } from "./src/types.ts";
-
-export type { FeatureId } from "./src/types.ts";
-
-// =============================================================================
-// Errors
-// =============================================================================
-
 export {
-    ConfigLoadError,
-    FeatureDisabledError,
-    FeatureFlagError,
-    FeatureNotFoundError as FeatureNotFoundErr,
-    FeatureSchemaError
-} from "./src/errors.ts";
+    ConfigLoadError, FeatureFlagError, featureId, FeatureIdFormatError,
+    FeatureNotEnabledError,
+    FeatureNotFoundError,
+    FeatureSchemaError,
+    getAncestorFeatureIds,
+    getFeatureDepth,
+    getParentFeatureId,
+    isAncestorOf,
+    isDescendantOf,
+    isValidFeatureId,
+    unsafeFeatureId
+} from "./src/types.ts";
 
 // =============================================================================
 // Schema
 // =============================================================================
 
 export {
+    buildSchema,
+    createEmptySchema,
     detectCircularDependencies,
-    isValidFeatureId,
+    getChildFeatureIds,
+    getDescendantFeatureIds,
+    mergeSchemas,
+    mergeValidationResults,
     validateFeatureDefinition,
+    validateFeatureId,
     validateSchema
 } from "./src/schema.ts";
+
+export type { ValidationResult } from "./src/schema.ts";
 
 // =============================================================================
 // Registry
@@ -70,10 +90,18 @@ export {
 export {
     cloneRegistry,
     createRegistry,
+    createSimpleRegistry,
+    disableFeature,
+    enableFeature,
     getFeature,
     getFeatureState,
+    isDisabled,
+    isEnabled,
+    listDisabledFeatures,
+    listEnabledFeatures,
     listFeatures,
-    registerFeature,
+    mergeRegistries,
+    requireFeature,
     setFeatureState
 } from "./src/registry.ts";
 
@@ -86,9 +114,13 @@ export type { CreateRegistryOptions } from "./src/registry.ts";
 export {
     allEnabled,
     anyEnabled,
-    expandFeatures,
-    isEnabled,
-    requireFeature
+    checkFeature, isDisabled as checkIsDisabled,
+    isEnabled as checkIsEnabled, choose,
+    contractFeatures,
+    countEnabled, requireFeature as evalRequireFeature, expandFeatures,
+    filterDisabled,
+    filterEnabled, noneEnabled, whenDisabled,
+    whenEnabled
 } from "./src/evaluate.ts";
 
 // =============================================================================
@@ -97,10 +129,22 @@ export {
 
 export {
     autoLoadConfig,
+    configFromDisabled,
+    configFromEnabled,
+    disableAllConfig,
+    emptyConfig,
+    enableAllConfig,
     loadFromCli,
     loadFromDenoJson,
     loadFromEnv,
     loadFromPackageJson,
-    mergeConfigs
+    mergeConfigs,
+    toFeatureConfig
+} from "./src/config.ts";
+
+export type {
+    FeatureDefinitionConfig,
+    FeatureFlagsConfig,
+    LoadConfigOptions
 } from "./src/config.ts";
 
