@@ -155,10 +155,12 @@ jobs:
       - name: Run integration test
         run: |
           cd npm
-          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
-          node esm/src/cli.js --package . list
-          node esm/src/cli.js --package . validate
-          node esm/src/cli.js --package . check std
+          # Create a temp directory with a proper package.json for testing
+          mkdir -p /tmp/ft-test-pkg
+          echo '{"name":"test-pkg","version":"1.0.0","features":{"default":["std"],"std":["fs"],"fs":[]}}' > /tmp/ft-test-pkg/package.json
+          node esm/src/cli.js --package /tmp/ft-test-pkg list
+          node esm/src/cli.js --package /tmp/ft-test-pkg validate
+          node esm/src/cli.js --package /tmp/ft-test-pkg check std
 
   # =============================================================================
   # Bun Tests
@@ -219,10 +221,12 @@ jobs:
       - name: Run integration test
         run: |
           cd npm
-          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
-          bun run esm/src/cli.js --package . list
-          bun run esm/src/cli.js --package . validate
-          bun run esm/src/cli.js --package . check std
+          # Create a temp directory with a proper package.json for testing
+          mkdir -p /tmp/ft-test-pkg
+          echo '{"name":"test-pkg","version":"1.0.0","features":{"default":["std"],"std":["fs"],"fs":[]}}' > /tmp/ft-test-pkg/package.json
+          bun run esm/src/cli.js --package /tmp/ft-test-pkg list
+          bun run esm/src/cli.js --package /tmp/ft-test-pkg validate
+          bun run esm/src/cli.js --package /tmp/ft-test-pkg check std
 
   # =============================================================================
   # Verify Runtime Tests Summary

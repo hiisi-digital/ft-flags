@@ -141,9 +141,11 @@ jobs:
             import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
             console.log('✓ Node.js ${{ matrix.node-version }} - ESM imports work');
           "
-          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
-          node esm/src/cli.js --package . list
-          node esm/src/cli.js --package . validate
+          # Create a temp directory with a proper package.json for testing
+          mkdir -p /tmp/ft-test-pkg
+          echo '{"name":"test-pkg","version":"1.0.0","features":{"default":["std"],"std":["fs"],"fs":[]}}' > /tmp/ft-test-pkg/package.json
+          node esm/src/cli.js --package /tmp/ft-test-pkg list
+          node esm/src/cli.js --package /tmp/ft-test-pkg validate
 
   test-bun-package:
     name: Test Bun Package
@@ -177,9 +179,11 @@ jobs:
             import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
             console.log('✓ Bun ${{ matrix.bun-version }} - ESM imports work');
           "
-          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
-          bun run esm/src/cli.js --package . list
-          bun run esm/src/cli.js --package . validate
+          # Create a temp directory with a proper package.json for testing
+          mkdir -p /tmp/ft-test-pkg
+          echo '{"name":"test-pkg","version":"1.0.0","features":{"default":["std"],"std":["fs"],"fs":[]}}' > /tmp/ft-test-pkg/package.json
+          bun run esm/src/cli.js --package /tmp/ft-test-pkg list
+          bun run esm/src/cli.js --package /tmp/ft-test-pkg validate
 
   create-release:
     name: Create GitHub Release
