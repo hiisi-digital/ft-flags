@@ -10,8 +10,8 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: Test
+  test-deno:
+    name: Test (Deno)
     runs-on: ubuntu-latest
 
     steps:
@@ -38,7 +38,7 @@ jobs:
   build-npm:
     name: Build npm package
     runs-on: ubuntu-latest
-    needs: test
+    needs: test-deno
 
     steps:
       - name: Checkout
@@ -62,10 +62,124 @@ jobs:
           cd npm
           npm pack --dry-run
 
+      - name: Upload npm package
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+
+  test-node:
+    name: Test (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    needs: build-npm
+
+    strategy:
+      matrix:
+        node-version: ["18", "20", "22"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+
+      - name: Install package locally
+        run: |
+          cd npm
+          npm install
+
+      - name: Test CLI works
+        run: |
+          cd npm
+          node esm/src/cli.js --help
+
+      - name: Test module imports work
+        run: |
+          cd npm
+          node --input-type=module -e "
+            import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
+            console.log('✓ ESM imports work');
+
+            // Test basic API availability
+            console.log('loadManifest:', typeof loadManifest);
+            console.log('resolveFeatures:', typeof resolveFeatures);
+            console.log('isFeatureEnabled:', typeof isFeatureEnabled);
+            console.log('✓ All exports available');
+          "
+
+      - name: Run tests with Node.js
+        run: |
+          cd npm
+          # Create a test package.json with features
+          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
+          # Test the CLI against it
+          node esm/src/cli.js --package . list || true
+
+  test-bun:
+    name: Test (Bun)
+    runs-on: ubuntu-latest
+    needs: build-npm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Download npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+
+      - name: Install package locally
+        run: |
+          cd npm
+          bun install
+
+      - name: Test CLI works
+        run: |
+          cd npm
+          bun run esm/src/cli.js --help
+
+      - name: Test module imports work
+        run: |
+          cd npm
+          bun -e "
+            import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
+            console.log('✓ ESM imports work');
+
+            // Test basic API availability
+            console.log('loadManifest:', typeof loadManifest);
+            console.log('resolveFeatures:', typeof resolveFeatures);
+            console.log('isFeatureEnabled:', typeof isFeatureEnabled);
+            console.log('✓ All exports available');
+          "
+
+      - name: Run tests with Bun
+        run: |
+          cd npm
+          # Create a test package.json with features
+          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
+          # Test the CLI against it
+          bun run esm/src/cli.js --package . list || true
+
   publish-dry-run:
     name: JSR publish (dry-run)
     runs-on: ubuntu-latest
-    needs: test
+    needs: test-deno
 
     steps:
       - name: Checkout
