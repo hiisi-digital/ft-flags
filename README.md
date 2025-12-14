@@ -11,13 +11,6 @@
 
 </div>
 
-<!-- PLATFORM_NOTICE:START -->
-<!-- This section is replaced in platform-specific builds -->
-
-> **Multi-platform package:** This package is available for both Deno ([JSR](https://jsr.io/@hiisi/ft-flags)) and Node.js/Bun ([npm](https://www.npmjs.com/package/ft-flags)). We produce slightly different builds optimized for each platform, with equivalent JSR ↔ npm package mappings where applicable.
-
-<!-- PLATFORM_NOTICE:END -->
-
 ## Overview
 
 `ft-flags` provides a robust feature flag system for TypeScript that follows the same conventions as Cargo features in Rust. Features can be:
@@ -29,6 +22,26 @@
 - **Queried via CLI** for scripting and debugging
 
 This package serves as the foundation for conditional compilation in the `@hiisi/cfg-ts` ecosystem.
+
+<!-- PLATFORM_NOTICE:START -->
+
+> **Multi-platform package:** This package is available for both Deno ([JSR](https://jsr.io/@hiisi/ft-flags)) and Node.js/Bun ([npm](https://www.npmjs.com/package/ft-flags)). We produce slightly different builds optimized for each platform, with equivalent JSR ↔ npm package mappings where applicable.
+
+<!-- PLATFORM_NOTICE:END -->
+
+<!-- SUPPORTED_VERSIONS:START -->
+
+### Supported Runtimes
+
+The following runtimes and versions are tested in CI. The package may work on other versions, but only these are officially verified:
+
+| Runtime | Tested Versions |
+| ------- | --------------- |
+| Deno    | v2.x            |
+| Node.js | 18, 20, 22      |
+| Bun     | latest          |
+
+<!-- SUPPORTED_VERSIONS:END -->
 
 ## Installation
 

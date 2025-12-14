@@ -68,5 +68,20 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
+      - name: Generate Deno-specific README
+        run: |
+          # Backup original README
+          cp README.md README.md.bak
+          # Generate Deno-specific README
+          deno run -A scripts/generate_readme.ts deno README.md
+          echo "Generated Deno-specific README for JSR publish"
+
       - name: Publish to JSR
         run: deno publish
+
+      - name: Restore original README
+        if: always()
+        run: |
+          if [ -f README.md.bak ]; then
+            mv README.md.bak README.md
+          fi

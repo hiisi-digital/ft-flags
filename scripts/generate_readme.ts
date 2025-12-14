@@ -50,6 +50,16 @@ const DENO_CONFIG: PlatformConfig = {
     PLATFORM_NOTICE: `> **Deno/JSR package:** This is the Deno-optimized version of ft-flags.
 > For Node.js or Bun, see [ft-flags on npm](https://www.npmjs.com/package/ft-flags).`,
 
+    SUPPORTED_VERSIONS: `### Supported Runtimes
+
+This is the Deno-optimized package. The following version is tested in CI:
+
+| Runtime | Tested Versions |
+|---------|-----------------|
+| Deno    | v2.x            |
+
+For Node.js or Bun support, use the [npm package](https://www.npmjs.com/package/ft-flags).`,
+
     INSTALL: `\`\`\`typescript
 // Import directly from JSR
 import { loadManifest, resolveFeatures } from "jsr:@hiisi/ft-flags";
@@ -142,6 +152,17 @@ const NODE_CONFIG: PlatformConfig = {
   sections: {
     PLATFORM_NOTICE: `> **npm package:** This is the Node.js and Bun optimized version of ft-flags.
 > For Deno, see [@hiisi/ft-flags on JSR](https://jsr.io/@hiisi/ft-flags).`,
+
+    SUPPORTED_VERSIONS: `### Supported Runtimes
+
+This is the Node.js/Bun optimized package. The following runtimes and versions are tested in CI:
+
+| Runtime | Tested Versions |
+|---------|-----------------|
+| Node.js | 18, 20, 22      |
+| Bun     | latest          |
+
+For Deno support, use the [JSR package](https://jsr.io/@hiisi/ft-flags).`,
 
     INSTALL: `\`\`\`bash
 # npm
