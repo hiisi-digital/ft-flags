@@ -73,9 +73,12 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
-      # Build Node.js/npm optimized package
+      # Build npm package using reusable action
       - name: Build npm package
-        run: deno run -A scripts/build_npm.ts ${{ steps.version.outputs.version }}
+        uses: ./.github/actions/build-npm
+        with:
+          version: ${{ steps.version.outputs.version }}
+          output-dir: npm
 
       - name: Create npm package archive
         run: |
@@ -83,20 +86,12 @@ jobs:
           tar -czvf ../ft-flags-${{ steps.version.outputs.version }}-node.tar.gz .
           cd ..
 
-      # Build Deno optimized package
-      - name: Create Deno package directory
-        run: mkdir -p deno-pkg
-
-      - name: Copy Deno package files
-        run: |
-          cp mod.ts deno-pkg/
-          cp -r src deno-pkg/
-          cp schema.json deno-pkg/
-          cp LICENSE deno-pkg/
-          cp deno.json deno-pkg/
-
-      - name: Generate Deno-specific README
-        run: deno run -A scripts/generate_readme.ts deno deno-pkg/README.md
+      # Build Deno package using reusable action
+      - name: Build Deno package
+        uses: ./.github/actions/build-deno
+        with:
+          version: ${{ steps.version.outputs.version }}
+          output-dir: deno-pkg
 
       - name: Create Deno package archive
         run: |
@@ -111,11 +106,86 @@ jobs:
           path: |
             ft-flags-${{ steps.version.outputs.version }}-node.tar.gz
             ft-flags-${{ steps.version.outputs.version }}-deno.tar.gz
+            npm/
+            deno-pkg/
+
+  # Test the built packages before release
+  test-node-package:
+    name: Test Node.js Package
+    runs-on: ubuntu-latest
+    needs: build-packages
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "20", "22"]
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: ./packages
+
+      - name: Test npm package
+        run: |
+          cd packages/npm
+          npm install
+          node esm/src/cli.js --help
+          node --input-type=module -e "
+            import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
+            console.log('✓ Node.js ${{ matrix.node-version }} - ESM imports work');
+          "
+          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
+          node esm/src/cli.js --package . list
+          node esm/src/cli.js --package . validate
+
+  test-bun-package:
+    name: Test Bun Package
+    runs-on: ubuntu-latest
+    needs: build-packages
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        bun-version: ["1.0", "latest"]
+
+    steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ matrix.bun-version }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: ./packages
+
+      - name: Test npm package with Bun
+        run: |
+          cd packages/npm
+          bun install
+          bun run esm/src/cli.js --help
+          bun -e "
+            import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
+            console.log('✓ Bun ${{ matrix.bun-version }} - ESM imports work');
+          "
+          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
+          bun run esm/src/cli.js --package . list
+          bun run esm/src/cli.js --package . validate
 
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: build-packages
+    needs: [test-node-package, test-bun-package]
+    if: always() && needs.test-node-package.result == 'success'
 
     steps:
       - name: Checkout
@@ -133,6 +203,17 @@ jobs:
           name: release-packages
           path: ./release-packages
 
+      - name: Determine Bun support status
+        id: bun-status
+        run: |
+          if [[ "${{ needs.test-bun-package.result }}" == "success" ]]; then
+            echo "supported=true" >> $GITHUB_OUTPUT
+            echo "badge=✓ Supported" >> $GITHUB_OUTPUT
+          else
+            echo "supported=false" >> $GITHUB_OUTPUT
+            echo "badge=⚠ Experimental" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate release notes
         run: |
           cat > release-notes.md << 'EOF'
@@ -149,6 +230,19 @@ jobs:
           ```bash
           npm install ft-flags
           ```
+
+          **Bun:**
+          ```bash
+          bun add ft-flags
+          ```
+
+          ### Tested Runtimes
+
+          | Runtime | Versions | Status |
+          |---------|----------|--------|
+          | Deno | 1.x, 2.x | ✓ Supported |
+          | Node.js | 18 LTS, 20 LTS, 22 | ✓ Supported |
+          | Bun | 1.0, latest | ${{ steps.bun-status.outputs.badge }} |
 
           ### Release Artifacts
 

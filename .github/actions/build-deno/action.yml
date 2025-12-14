@@ -1,0 +1,61 @@
+name: "Build Deno Package"
+description: "Builds the Deno/JSR optimized package with platform-specific README"
+
+inputs:
+  version:
+    description: "Package version"
+    required: true
+  output-dir:
+    description: "Output directory for the package"
+    required: false
+    default: "deno-pkg"
+
+outputs:
+  package-dir:
+    description: "Path to the built package directory"
+    value: ${{ inputs.output-dir }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create package directory
+      shell: bash
+      run: mkdir -p ${{ inputs.output-dir }}
+
+    - name: Copy source files
+      shell: bash
+      run: |
+        cp mod.ts ${{ inputs.output-dir }}/
+        cp -r src ${{ inputs.output-dir }}/
+        cp schema.json ${{ inputs.output-dir }}/
+        cp LICENSE ${{ inputs.output-dir }}/
+
+    - name: Generate deno.json with version
+      shell: bash
+      run: |
+        # Read existing deno.json and update version
+        deno eval "
+          const config = JSON.parse(Deno.readTextFileSync('deno.json'));
+          config.version = '${{ inputs.version }}';
+          // Remove dev-only fields for publish
+          delete config.tasks;
+          delete config.imports;
+          delete config.lint;
+          delete config.fmt;
+          Deno.writeTextFileSync('${{ inputs.output-dir }}/deno.json', JSON.stringify(config, null, 2));
+        "
+
+    - name: Generate Deno-specific README
+      shell: bash
+      run: |
+        deno run -A scripts/generate_readme.ts deno ${{ inputs.output-dir }}/README.md
+        echo "Generated Deno-specific README"
+
+    - name: Verify package structure
+      shell: bash
+      run: |
+        echo "Package contents:"
+        ls -la ${{ inputs.output-dir }}/
+        echo ""
+        echo "Source files:"
+        ls -la ${{ inputs.output-dir }}/src/

@@ -35,8 +35,8 @@ jobs:
       - name: Run tests
         run: deno test --allow-read --allow-write --allow-env --allow-run --allow-net
 
-  build-and-test:
-    name: Build and Test npm package
+  build:
+    name: Build npm package
     runs-on: ubuntu-latest
     needs: validate
 
@@ -53,14 +53,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Extract version from tag
         id: version
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Publishing version: $VERSION"
+          echo "Building version: $VERSION"
 
       - name: Verify version matches deno.json
         run: |
@@ -75,17 +74,10 @@ jobs:
           echo "Version verified: $TAG_VERSION"
 
       - name: Build npm package
-        run: deno run -A scripts/build_npm.ts ${{ steps.version.outputs.version }}
-
-      - name: Test with Node.js
-        run: |
-          cd npm
-          npm install
-          node esm/src/cli.js --help
-          node --input-type=module -e "
-            import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
-            console.log('✓ ESM imports work');
-          "
+        uses: ./.github/actions/build-npm
+        with:
+          version: ${{ steps.version.outputs.version }}
+          output-dir: npm
 
       - name: Upload npm package
         uses: actions/upload-artifact@v4
@@ -93,16 +85,28 @@ jobs:
           name: npm-package
           path: npm/
 
-  test-bun:
-    name: Test with Bun
+  test-node:
+    name: Test (Node.js ${{ matrix.node-version }})
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: build
+
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["18", "20", "22"]
+        include:
+          - node-version: "18"
+            is-lts: true
+          - node-version: "20"
+            is-lts: true
+          - node-version: "22"
+            is-latest: true
 
     steps:
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          bun-version: latest
+          node-version: ${{ matrix.node-version }}
 
       - name: Download npm package
         uses: actions/download-artifact@v4
@@ -110,20 +114,129 @@ jobs:
           name: npm-package
           path: npm/
 
-      - name: Test with Bun
+      - name: Install package
+        run: |
+          cd npm
+          npm install
+
+      - name: Test CLI
+        run: |
+          cd npm
+          node esm/src/cli.js --help
+
+      - name: Test ESM imports
+        run: |
+          cd npm
+          node --input-type=module -e "
+            import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
+            console.log('✓ Node.js ${{ matrix.node-version }} - ESM imports work');
+            console.log('loadManifest:', typeof loadManifest);
+            console.log('resolveFeatures:', typeof resolveFeatures);
+            console.log('isFeatureEnabled:', typeof isFeatureEnabled);
+          "
+
+      - name: Test integration
+        run: |
+          cd npm
+          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
+          node esm/src/cli.js --package . list
+          node esm/src/cli.js --package . validate
+          node esm/src/cli.js --package . check std
+
+  test-bun:
+    name: Test (Bun ${{ matrix.bun-version }})
+    runs-on: ubuntu-latest
+    needs: build
+    continue-on-error: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        bun-version: ["1.0", "latest"]
+        include:
+          - bun-version: "1.0"
+            is-lts: true
+          - bun-version: "latest"
+            is-latest: true
+
+    steps:
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ matrix.bun-version }}
+
+      - name: Download npm package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: npm/
+
+      - name: Install package
         run: |
           cd npm
           bun install
+
+      - name: Test CLI
+        run: |
+          cd npm
           bun run esm/src/cli.js --help
+
+      - name: Test ESM imports
+        run: |
+          cd npm
           bun -e "
             import { loadManifest, resolveFeatures, isFeatureEnabled } from './esm/mod.js';
-            console.log('✓ ESM imports work in Bun');
+            console.log('✓ Bun ${{ matrix.bun-version }} - ESM imports work');
+            console.log('loadManifest:', typeof loadManifest);
+            console.log('resolveFeatures:', typeof resolveFeatures);
+            console.log('isFeatureEnabled:', typeof isFeatureEnabled);
           "
 
-  publish-npm:
+      - name: Test integration
+        run: |
+          cd npm
+          echo '{"features":{"default":["std"],"std":["fs"],"fs":[]}}' > test-package.json
+          bun run esm/src/cli.js --package . list
+          bun run esm/src/cli.js --package . validate
+          bun run esm/src/cli.js --package . check std
+
+  verify-tests:
+    name: Verify Tests Passed
+    runs-on: ubuntu-latest
+    needs: [test-node, test-bun]
+    if: always()
+
+    steps:
+      - name: Check Node.js tests
+        run: |
+          if [[ "${{ needs.test-node.result }}" != "success" ]]; then
+            echo "✗ Node.js tests failed - cannot publish"
+            exit 1
+          fi
+          echo "✓ Node.js tests passed"
+
+      - name: Check Bun tests
+        run: |
+          if [[ "${{ needs.test-bun.result }}" == "success" ]]; then
+            echo "✓ Bun tests passed"
+          else
+            echo "⚠ Bun tests failed (continuing - Bun support is best-effort)"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## npm Release Test Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Runtime | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Node.js | ${{ needs.test-node.result == 'success' && '✓ Passed' || '✗ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bun | ${{ needs.test-bun.result == 'success' && '✓ Passed' || '⚠ Failed (best-effort)' }} |" >> $GITHUB_STEP_SUMMARY
+
+  publish:
     name: Publish to npm
     runs-on: ubuntu-latest
-    needs: [build-and-test, test-bun]
+    needs: verify-tests
+    if: needs.verify-tests.result == 'success'
 
     steps:
       - name: Download npm package

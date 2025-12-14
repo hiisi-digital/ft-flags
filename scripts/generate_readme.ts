@@ -52,11 +52,11 @@ const DENO_CONFIG: PlatformConfig = {
 
     SUPPORTED_VERSIONS: `### Supported Runtimes
 
-This is the Deno-optimized package. The following version is tested in CI:
+This is the Deno-optimized package. The following versions are tested in CI:
 
-| Runtime | Tested Versions |
-|---------|-----------------|
-| Deno    | v2.x            |
+| Runtime | Tested Versions | Notes |
+|---------|-----------------|-------|
+| Deno    | 1.x, 2.x        | 2.x is primary, 1.x is best-effort |
 
 For Node.js or Bun support, use the [npm package](https://www.npmjs.com/package/ft-flags).`,
 
@@ -157,10 +157,10 @@ const NODE_CONFIG: PlatformConfig = {
 
 This is the Node.js/Bun optimized package. The following runtimes and versions are tested in CI:
 
-| Runtime | Tested Versions |
-|---------|-----------------|
-| Node.js | 18, 20, 22      |
-| Bun     | latest          |
+| Runtime | Tested Versions | Notes |
+|---------|-----------------|-------|
+| Node.js | 18 LTS, 20 LTS, 22 | 22 is latest stable |
+| Bun     | 1.0, latest     | Bun support is best-effort |
 
 For Deno support, use the [JSR package](https://jsr.io/@hiisi/ft-flags).`,
 

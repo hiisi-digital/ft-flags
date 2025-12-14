@@ -1,0 +1,43 @@
+name: "Build npm Package"
+description: "Builds the Node.js/Bun optimized npm package using dnt with platform-specific README"
+
+inputs:
+  version:
+    description: "Package version"
+    required: true
+  output-dir:
+    description: "Output directory for the package"
+    required: false
+    default: "npm"
+
+outputs:
+  package-dir:
+    description: "Path to the built package directory"
+    value: ${{ inputs.output-dir }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Build npm package with dnt
+      shell: bash
+      run: |
+        deno run -A scripts/build_npm.ts ${{ inputs.version }}
+        echo "Built npm package version ${{ inputs.version }}"
+
+    - name: Verify package structure
+      shell: bash
+      run: |
+        echo "Package contents:"
+        ls -la ${{ inputs.output-dir }}/
+        echo ""
+        echo "ESM files:"
+        ls -la ${{ inputs.output-dir }}/esm/ || true
+        echo ""
+        echo "package.json:"
+        cat ${{ inputs.output-dir }}/package.json
+
+    - name: Verify npm pack works
+      shell: bash
+      run: |
+        cd ${{ inputs.output-dir }}
+        npm pack --dry-run

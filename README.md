@@ -35,11 +35,11 @@ This package serves as the foundation for conditional compilation in the `@hiisi
 
 The following runtimes and versions are tested in CI. The package may work on other versions, but only these are officially verified:
 
-| Runtime | Tested Versions |
-| ------- | --------------- |
-| Deno    | v2.x            |
-| Node.js | 18, 20, 22      |
-| Bun     | latest          |
+| Runtime | Tested Versions    | Notes                              |
+| ------- | ------------------ | ---------------------------------- |
+| Deno    | 1.x, 2.x           | 2.x is primary, 1.x is best-effort |
+| Node.js | 18 LTS, 20 LTS, 22 | 22 is latest stable                |
+| Bun     | 1.0, latest        | Bun support is best-effort         |
 
 <!-- SUPPORTED_VERSIONS:END -->
 
