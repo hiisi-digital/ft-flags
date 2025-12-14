@@ -3,6 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
+    tags-ignore:
+      - "**"
   pull_request:
     branches: [main]
 
@@ -26,6 +28,10 @@ jobs:
     name: Test (Deno ${{ matrix.deno-version }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.deno-version == '1.x' }}
+
+    outputs:
+      result-1x: ${{ steps.result.outputs.v1x }}
+      result-2x: ${{ steps.result.outputs.v2x }}
 
     strategy:
       fail-fast: false
@@ -56,7 +62,18 @@ jobs:
         run: deno check mod.ts
 
       - name: Run tests
+        id: tests
         run: deno test --allow-read --allow-write --allow-env --allow-run --allow-net
+
+      - name: Set result output
+        id: result
+        if: always()
+        run: |
+          if [[ "${{ matrix.deno-version }}" == "1.x" ]]; then
+            echo "v1x=${{ steps.tests.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+          else
+            echo "v2x=${{ steps.tests.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+          fi
 
   # =============================================================================
   # Build npm Package
@@ -102,6 +119,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-npm
     continue-on-error: true
+    outputs:
+      result-18: ${{ steps.result.outputs.v18 }}
+      result-20: ${{ steps.result.outputs.v20 }}
+      result-22: ${{ steps.result.outputs.v22 }}
 
     strategy:
       fail-fast: false
@@ -153,6 +174,7 @@ jobs:
           "
 
       - name: Run integration test
+        id: integration
         run: |
           cd npm
           # Create a temp directory with a proper package.json for testing
@@ -162,6 +184,12 @@ jobs:
           node esm/src/cli.js --package /tmp/ft-test-pkg validate
           node esm/src/cli.js --package /tmp/ft-test-pkg check std
 
+      - name: Set result output
+        id: result
+        if: always()
+        run: |
+          echo "v${{ matrix.node-version }}=${{ steps.integration.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+
   # =============================================================================
   # Bun Tests
   # =============================================================================
@@ -170,6 +198,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-npm
     continue-on-error: true
+    outputs:
+      result-1_0: ${{ steps.result.outputs.v1_0 }}
+      result-latest: ${{ steps.result.outputs.vlatest }}
 
     strategy:
       fail-fast: false
@@ -219,6 +250,7 @@ jobs:
           "
 
       - name: Run integration test
+        id: integration
         run: |
           cd npm
           # Create a temp directory with a proper package.json for testing
@@ -227,6 +259,15 @@ jobs:
           bun run esm/src/cli.js --package /tmp/ft-test-pkg list
           bun run esm/src/cli.js --package /tmp/ft-test-pkg validate
           bun run esm/src/cli.js --package /tmp/ft-test-pkg check std
+
+      - name: Set result output
+        id: result
+        if: always()
+        run: |
+          VERSION="${{ matrix.bun-version }}"
+          # Replace dots with underscores for output name
+          VERSION_SAFE="${VERSION//./_}"
+          echo "v${VERSION_SAFE}=${{ steps.integration.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
 
   # =============================================================================
   # Verify Runtime Tests Summary
@@ -268,13 +309,27 @@ jobs:
         run: |
           echo "## Runtime Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Runtime | 1.x | 2.x | 18 | 20 | 22 | 1.0 | latest |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|:---:|:---:|:--:|:--:|:--:|:---:|:------:|" >> $GITHUB_STEP_SUMMARY
-          echo "| Deno    | ⚠️  | ${{ needs.test-deno.result == 'success' && '✅' || '❌' }} | —  | —  | —  | —   | —      |" >> $GITHUB_STEP_SUMMARY
-          echo "| Node.js | —   | —   | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | —   | —      |" >> $GITHUB_STEP_SUMMARY
-          echo "| Bun     | —   | —   | —  | —  | —  | ${{ needs.test-bun.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun.result == 'success' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "### Deno" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Legend: ✅ = Passed, ⚠️ = Best-effort (may fail), ❌ = Failed, — = N/A_" >> $GITHUB_STEP_SUMMARY
+          echo "| 1.x | 2.x |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---:|:---:|" >> $GITHUB_STEP_SUMMARY
+          echo "| ⚠️ | ${{ needs.test-deno.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_1.x is best-effort due to lockfile version incompatibility_" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Node.js" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 18 | 20 | 22 |" >> $GITHUB_STEP_SUMMARY
+          echo "|:--:|:--:|:--:|" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bun" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 1.0 | latest |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---:|:------:|" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ needs.test-bun.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun.result == 'success' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Bun support is best-effort_" >> $GITHUB_STEP_SUMMARY
 
   # =============================================================================
   # Publish Dry Run

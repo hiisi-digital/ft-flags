@@ -231,12 +231,19 @@ jobs:
         run: |
           echo "## npm Release Test Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Runtime | 18 | 20 | 22 | 1.0 | latest |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|:--:|:--:|:--:|:---:|:------:|" >> $GITHUB_STEP_SUMMARY
-          echo "| Node.js | ✅ | ✅ | ✅ | — | — |" >> $GITHUB_STEP_SUMMARY
-          echo "| Bun | — | — | — | ${{ needs.test-bun.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun.result == 'success' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "### Node.js" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "_Note: Bun support is best-effort and failures don't block releases._" >> $GITHUB_STEP_SUMMARY
+          echo "| 18 | 20 | 22 |" >> $GITHUB_STEP_SUMMARY
+          echo "|:--:|:--:|:--:|" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} | ${{ needs.test-node.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Bun" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 1.0 | latest |" >> $GITHUB_STEP_SUMMARY
+          echo "|:---:|:------:|" >> $GITHUB_STEP_SUMMARY
+          echo "| ${{ needs.test-bun.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun.result == 'success' && '✅' || '⚠️' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Bun support is best-effort_" >> $GITHUB_STEP_SUMMARY
 
   publish:
     name: Publish to npm

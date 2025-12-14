@@ -110,8 +110,46 @@ jobs:
             deno-pkg/
 
   # Test the built packages before release
+  test-deno:
+    name: Test Deno ${{ matrix.deno-version }}
+    runs-on: ubuntu-latest
+    needs: build-packages
+    continue-on-error: ${{ matrix.deno-version == '1.x' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        deno-version: ["1.x", "2.x"]
+
+    outputs:
+      result-1x: ${{ steps.result.outputs.v1x }}
+      result-2x: ${{ steps.result.outputs.v2x }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ matrix.deno-version }}
+
+      - name: Run tests
+        id: tests
+        run: deno test --allow-read --allow-write --allow-env --allow-run --allow-net
+
+      - name: Set result output
+        id: result
+        if: always()
+        run: |
+          if [[ "${{ matrix.deno-version }}" == "1.x" ]]; then
+            echo "v1x=${{ steps.tests.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+          else
+            echo "v2x=${{ steps.tests.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+          fi
+
   test-node-package:
-    name: Test Node.js Package
+    name: Test Node.js ${{ matrix.node-version }}
     runs-on: ubuntu-latest
     needs: build-packages
 
@@ -119,6 +157,11 @@ jobs:
       fail-fast: false
       matrix:
         node-version: ["18", "20", "22"]
+
+    outputs:
+      result-18: ${{ steps.result.outputs.v18 }}
+      result-20: ${{ steps.result.outputs.v20 }}
+      result-22: ${{ steps.result.outputs.v22 }}
 
     steps:
       - name: Setup Node.js
@@ -133,6 +176,7 @@ jobs:
           path: ./packages
 
       - name: Test npm package
+        id: tests
         run: |
           cd packages/npm
           npm install
@@ -147,8 +191,14 @@ jobs:
           node esm/src/cli.js --package /tmp/ft-test-pkg list
           node esm/src/cli.js --package /tmp/ft-test-pkg validate
 
+      - name: Set result output
+        id: result
+        if: always()
+        run: |
+          echo "v${{ matrix.node-version }}=${{ steps.tests.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+
   test-bun-package:
-    name: Test Bun Package
+    name: Test Bun ${{ matrix.bun-version }}
     runs-on: ubuntu-latest
     needs: build-packages
     continue-on-error: true
@@ -157,6 +207,10 @@ jobs:
       fail-fast: false
       matrix:
         bun-version: ["1.0", "latest"]
+
+    outputs:
+      result-1_0: ${{ steps.result.outputs.v1_0 }}
+      result-latest: ${{ steps.result.outputs.vlatest }}
 
     steps:
       - name: Setup Bun
@@ -171,6 +225,7 @@ jobs:
           path: ./packages
 
       - name: Test npm package with Bun
+        id: tests
         run: |
           cd packages/npm
           bun install
@@ -185,15 +240,31 @@ jobs:
           bun run esm/src/cli.js --package /tmp/ft-test-pkg list
           bun run esm/src/cli.js --package /tmp/ft-test-pkg validate
 
+      - name: Set result output
+        id: result
+        if: always()
+        run: |
+          VERSION="${{ matrix.bun-version }}"
+          VERSION_SAFE="${VERSION//./_}"
+          echo "v${VERSION_SAFE}=${{ steps.tests.outcome == 'success' && '✅' || '❌' }}" >> $GITHUB_OUTPUT
+
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [test-node-package, test-bun-package]
+    needs: [test-deno, test-node-package, test-bun-package]
     if: always() && needs.test-node-package.result == 'success'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Extract version from tag
         id: version
@@ -207,15 +278,109 @@ jobs:
           name: release-packages
           path: ./release-packages
 
+      - name: Determine test results
+        id: test-results
+        run: |
+          # Deno results
+          DENO_1X="${{ needs.test-deno.result == 'success' && '⚠️' || '❌' }}"
+          DENO_2X="${{ needs.test-deno.result == 'success' && '✅' || '❌' }}"
+          
+          # Node.js results
+          NODE_18="${{ needs.test-node-package.result == 'success' && '✅' || '❌' }}"
+          NODE_20="${{ needs.test-node-package.result == 'success' && '✅' || '❌' }}"
+          NODE_22="${{ needs.test-node-package.result == 'success' && '✅' || '❌' }}"
+          
+          # Bun results
+          BUN_1_0="${{ needs.test-bun-package.result == 'success' && '✅' || '❌' }}"
+          BUN_LATEST="${{ needs.test-bun-package.result == 'success' && '✅' || '⚠️' }}"
+          
+          echo "deno_1x=$DENO_1X" >> $GITHUB_OUTPUT
+          echo "deno_2x=$DENO_2X" >> $GITHUB_OUTPUT
+          echo "node_18=$NODE_18" >> $GITHUB_OUTPUT
+          echo "node_20=$NODE_20" >> $GITHUB_OUTPUT
+          echo "node_22=$NODE_22" >> $GITHUB_OUTPUT
+          echo "bun_1_0=$BUN_1_0" >> $GITHUB_OUTPUT
+          echo "bun_latest=$BUN_LATEST" >> $GITHUB_OUTPUT
+
+      - name: Update README with test results
+        run: |
+          # Create the new SUPPORTED_VERSIONS section content
+          cat > /tmp/supported_versions.txt << 'EOF'
+          ### Supported Runtimes
+
+          The following runtimes and versions are tested in CI. The package may work on other versions, but only these are officially verified:
+
+          #### Deno
+
+          | 1.x | 2.x |
+          |:---:|:---:|
+          | ${{ steps.test-results.outputs.deno_1x }} | ${{ steps.test-results.outputs.deno_2x }} |
+
+          _1.x is best-effort due to lockfile version incompatibility_
+
+          #### Node.js
+
+          | 18 | 20 | 22 |
+          |:--:|:--:|:--:|
+          | ${{ steps.test-results.outputs.node_18 }} | ${{ steps.test-results.outputs.node_20 }} | ${{ steps.test-results.outputs.node_22 }} |
+
+          #### Bun
+
+          | 1.0 | latest |
+          |:---:|:------:|
+          | ${{ steps.test-results.outputs.bun_1_0 }} | ${{ steps.test-results.outputs.bun_latest }} |
+
+          _Bun support is best-effort_
+          EOF
+
+          # Use deno to update the README
+          deno eval "
+            const readme = Deno.readTextFileSync('README.md');
+            const newContent = Deno.readTextFileSync('/tmp/supported_versions.txt');
+            
+            const startMarker = '<!-- SUPPORTED_VERSIONS:START -->';
+            const endMarker = '<!-- SUPPORTED_VERSIONS:END -->';
+            
+            const startIdx = readme.indexOf(startMarker);
+            const endIdx = readme.indexOf(endMarker);
+            
+            if (startIdx === -1 || endIdx === -1) {
+              console.error('Could not find SUPPORTED_VERSIONS markers');
+              Deno.exit(1);
+            }
+            
+            const before = readme.slice(0, startIdx + startMarker.length);
+            const after = readme.slice(endIdx);
+            
+            const updated = before + '\n' + newContent.trim() + '\n\n' + after;
+            Deno.writeTextFileSync('README.md', updated);
+            console.log('README.md updated with test results');
+          "
+
+      - name: Commit and push README updates
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if there are changes
+          if git diff --quiet README.md; then
+            echo "No changes to README.md"
+          else
+            git add README.md
+            git commit -m "docs: update runtime test results [skip ci]"
+            git push origin HEAD:main
+            echo "README.md updated and pushed"
+          fi
+
       - name: Determine Bun support status
         id: bun-status
         run: |
           if [[ "${{ needs.test-bun-package.result }}" == "success" ]]; then
             echo "supported=true" >> $GITHUB_OUTPUT
-            echo "badge=✓ Supported" >> $GITHUB_OUTPUT
+            echo "badge=✅ Supported" >> $GITHUB_OUTPUT
           else
             echo "supported=false" >> $GITHUB_OUTPUT
-            echo "badge=⚠ Experimental" >> $GITHUB_OUTPUT
+            echo "badge=⚠️ Best-effort" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate release notes
@@ -242,13 +407,27 @@ jobs:
 
           ### Tested Runtimes
 
-          | Runtime | 1.x | 2.x | 18 | 20 | 22 | 1.0 | latest |
-          |---------|:---:|:---:|:--:|:--:|:--:|:---:|:------:|
-          | Deno    | ⚠️  | ✅  | —  | —  | —  | —   | —      |
-          | Node.js | —   | —   | ✅ | ✅ | ✅ | —   | —      |
-          | Bun     | —   | —   | —  | —  | —  | ${{ needs.test-bun-package.result == 'success' && '✅' || '❌' }} | ${{ needs.test-bun-package.result == 'success' && '✅' || '⚠️' }} |
+          #### Deno
 
-          _Legend: ✅ = Passed, ⚠️ = Best-effort (may fail), ❌ = Failed, — = N/A_
+          | 1.x | 2.x |
+          |:---:|:---:|
+          | ${{ steps.test-results.outputs.deno_1x }} | ${{ steps.test-results.outputs.deno_2x }} |
+
+          _1.x is best-effort due to lockfile version incompatibility_
+
+          #### Node.js
+
+          | 18 | 20 | 22 |
+          |:--:|:--:|:--:|
+          | ${{ steps.test-results.outputs.node_18 }} | ${{ steps.test-results.outputs.node_20 }} | ${{ steps.test-results.outputs.node_22 }} |
+
+          #### Bun
+
+          | 1.0 | latest |
+          |:---:|:------:|
+          | ${{ steps.test-results.outputs.bun_1_0 }} | ${{ steps.test-results.outputs.bun_latest }} |
+
+          _Bun support is best-effort_
 
           ### Release Artifacts
 
