@@ -37,6 +37,50 @@ interface ParsedArgs {
   flags: Record<string, string | boolean>;
 }
 
+interface FlagParseResult {
+  key: string;
+  value: string | boolean;
+  consumedNext: boolean;
+}
+
+/**
+ * Parses a single flag argument (--flag, --flag=value, -f, or -f value).
+ * Returns the parsed key/value and whether the next argument was consumed.
+ */
+function parseFlag(arg: string, nextArg: string | undefined): FlagParseResult {
+  const isLongFlag = arg.startsWith("--");
+  const prefix = isLongFlag ? 2 : 1;
+
+  // Check for --flag=value format
+  if (isLongFlag) {
+    const eqIndex = arg.indexOf("=");
+    if (eqIndex !== -1) {
+      return {
+        key: arg.slice(prefix, eqIndex),
+        value: arg.slice(eqIndex + 1),
+        consumedNext: false,
+      };
+    }
+  }
+
+  // --flag or -f, possibly followed by a value
+  const key = arg.slice(prefix);
+  const hasValue = nextArg !== undefined && !nextArg.startsWith("-");
+
+  return {
+    key,
+    value: hasValue ? nextArg : true,
+    consumedNext: hasValue,
+  };
+}
+
+/**
+ * Checks if an argument is a flag (starts with - or --).
+ */
+function isFlag(arg: string): boolean {
+  return arg.startsWith("-");
+}
+
 function parseArgs(args: string[]): ParsedArgs {
   const result: ParsedArgs = {
     command: "",
@@ -49,75 +93,27 @@ function parseArgs(args: string[]): ParsedArgs {
   // Parse flags that come before the command (like --package)
   while (i < args.length) {
     const arg = args[i];
-    if (!arg.startsWith("-")) {
+    if (!isFlag(arg)) {
       // First non-flag argument is the command
       result.command = arg;
       i++;
       break;
     }
 
-    // Handle flags before command
-    if (arg.startsWith("--")) {
-      const eqIndex = arg.indexOf("=");
-      if (eqIndex !== -1) {
-        const key = arg.slice(2, eqIndex);
-        const value = arg.slice(eqIndex + 1);
-        result.flags[key] = value;
-      } else {
-        const key = arg.slice(2);
-        const nextArg = args[i + 1];
-        if (nextArg && !nextArg.startsWith("-")) {
-          result.flags[key] = nextArg;
-          i++;
-        } else {
-          result.flags[key] = true;
-        }
-      }
-    } else if (arg.startsWith("-")) {
-      const key = arg.slice(1);
-      const nextArg = args[i + 1];
-      if (nextArg && !nextArg.startsWith("-")) {
-        result.flags[key] = nextArg;
-        i++;
-      } else {
-        result.flags[key] = true;
-      }
-    }
+    const parsed = parseFlag(arg, args[i + 1]);
+    result.flags[parsed.key] = parsed.value;
+    if (parsed.consumedNext) i++;
     i++;
   }
 
-  // Parse remaining arguments
+  // Parse remaining arguments (after command)
   while (i < args.length) {
     const arg = args[i];
 
-    if (arg.startsWith("--")) {
-      const eqIndex = arg.indexOf("=");
-      if (eqIndex !== -1) {
-        // --flag=value
-        const key = arg.slice(2, eqIndex);
-        const value = arg.slice(eqIndex + 1);
-        result.flags[key] = value;
-      } else {
-        // --flag or --flag value
-        const key = arg.slice(2);
-        const nextArg = args[i + 1];
-        if (nextArg && !nextArg.startsWith("-")) {
-          result.flags[key] = nextArg;
-          i++;
-        } else {
-          result.flags[key] = true;
-        }
-      }
-    } else if (arg.startsWith("-")) {
-      // Short flags like -f
-      const key = arg.slice(1);
-      const nextArg = args[i + 1];
-      if (nextArg && !nextArg.startsWith("-")) {
-        result.flags[key] = nextArg;
-        i++;
-      } else {
-        result.flags[key] = true;
-      }
+    if (isFlag(arg)) {
+      const parsed = parseFlag(arg, args[i + 1]);
+      result.flags[parsed.key] = parsed.value;
+      if (parsed.consumedNext) i++;
     } else {
       result.positional.push(arg);
     }

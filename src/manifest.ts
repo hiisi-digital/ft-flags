@@ -187,149 +187,124 @@ export interface ExternalReference {
 // =============================================================================
 
 /**
- * Loads a feature manifest from deno.json.
- *
- * Features are defined at the root level of the config file.
- * Optional metadata uses the `metadata.features` namespace:
- * ```json
- * {
- *   "name": "@my/package",
- *   "features": {
- *     "default": ["std"],
- *     "std": ["fs", "env"]
- *   },
- *   "metadata": {
- *     "features": {
- *       "std": { "description": "Standard library" }
- *     }
- *   }
- * }
- * ```
- *
- * @param path - Path to deno.json (default: "./deno.json")
- * @returns The loaded manifest, or null if no features config found
- * @throws ConfigLoadError if the file cannot be read or parsed
+ * Options for loading a manifest from a config file.
  */
-export async function loadManifestFromDenoJson(
-  path?: string,
-): Promise<FeatureManifest | null> {
-  const configPath = path ?? "./deno.json";
+interface LoadManifestOptions {
+  /** Path to the config file */
+  path: string;
+  /** Type of config file */
+  type: "deno.json" | "package.json";
+  /** Extract dependencies from the parsed JSON */
+  extractDeps: (json: Record<string, unknown>) => PackageDependencies | undefined;
+}
 
+/**
+ * Extracts the feature config from a parsed JSON config file.
+ * This is shared logic between deno.json and package.json loading.
+ */
+function extractFeaturesConfig(
+  json: Record<string, unknown>,
+): RawFtFlagsConfig | null {
+  // Features are at the root level, not nested
+  const features = json.features as Record<string, string[]> | undefined;
+
+  if (!features) {
+    return null;
+  }
+
+  // Metadata follows the convention: metadata.features.{feature-name}
+  const metadata = json.metadata as Record<string, unknown> | undefined;
+  const featureMetadata = metadata?.features as
+    | Record<string, FeatureManifestMetadata>
+    | undefined;
+
+  return {
+    features,
+    metadata: featureMetadata,
+  };
+}
+
+/**
+ * Generic config file loader that handles common patterns.
+ */
+async function loadManifestFromConfigFile(
+  options: LoadManifestOptions,
+): Promise<FeatureManifest | null> {
   try {
-    const content = await Deno.readTextFile(configPath);
+    const content = await Deno.readTextFile(options.path);
     const json = JSON.parse(content) as Record<string, unknown>;
 
-    // Features are at the root level, not nested
-    const features = json.features as Record<string, string[]> | undefined;
-
-    if (!features) {
+    const rawConfig = extractFeaturesConfig(json);
+    if (!rawConfig) {
       return null;
     }
 
-    // Metadata follows the convention: metadata.features.{feature-name}
-    const metadata = json.metadata as Record<string, unknown> | undefined;
-    const featureMetadata = metadata?.features as
-      | Record<string, FeatureManifestMetadata>
-      | undefined;
-
-    const rawConfig: RawFtFlagsConfig = {
-      features,
-      metadata: featureMetadata,
-    };
-
-    // Extract imports as dependencies for Deno
-    const imports = json.imports as Record<string, string> | undefined;
-    const deps: PackageDependencies | undefined = imports
-      ? { dependencies: Object.fromEntries(Object.keys(imports).map((k) => [k, "*"])) }
-      : undefined;
+    const deps = options.extractDeps(json);
 
     return parseManifest(rawConfig, {
-      type: "deno.json",
-      path: configPath,
+      type: options.type,
+      path: options.path,
     }, deps);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       return null;
     }
     throw new ConfigLoadError(
-      `Failed to load deno.json: ${error instanceof Error ? error.message : String(error)}`,
-      configPath,
+      `Failed to load ${options.type}: ${error instanceof Error ? error.message : String(error)}`,
+      options.path,
     );
   }
+}
+
+/**
+ * Loads a feature manifest from deno.json.
+ *
+ * Features are defined at the root level of the config file.
+ * Optional metadata uses the `metadata.features` namespace.
+ *
+ * @param path - Path to deno.json (default: "./deno.json")
+ * @returns The loaded manifest, or null if no features config found
+ * @throws ConfigLoadError if the file cannot be read or parsed
+ */
+export function loadManifestFromDenoJson(
+  path?: string,
+): Promise<FeatureManifest | null> {
+  return loadManifestFromConfigFile({
+    path: path ?? "./deno.json",
+    type: "deno.json",
+    extractDeps: (json) => {
+      // Extract imports as dependencies for Deno
+      const imports = json.imports as Record<string, string> | undefined;
+      return imports
+        ? { dependencies: Object.fromEntries(Object.keys(imports).map((k) => [k, "*"])) }
+        : undefined;
+    },
+  });
 }
 
 /**
  * Loads a feature manifest from package.json.
  *
  * Features are defined at the root level of the config file.
- * Optional metadata uses the `metadata.features` namespace:
- * ```json
- * {
- *   "name": "@my/package",
- *   "features": {
- *     "default": ["std"],
- *     "std": ["fs", "env"]
- *   },
- *   "metadata": {
- *     "features": {
- *       "std": { "description": "Standard library" }
- *     }
- *   }
- * }
- * ```
+ * Optional metadata uses the `metadata.features` namespace.
  *
  * @param path - Path to package.json (default: "./package.json")
  * @returns The loaded manifest, or null if no features config found
  * @throws ConfigLoadError if the file cannot be read or parsed
  */
-export async function loadManifestFromPackageJson(
+export function loadManifestFromPackageJson(
   path?: string,
 ): Promise<FeatureManifest | null> {
-  const configPath = path ?? "./package.json";
-
-  try {
-    const content = await Deno.readTextFile(configPath);
-    const json = JSON.parse(content) as Record<string, unknown>;
-
-    // Features are at the root level, not nested
-    const features = json.features as Record<string, string[]> | undefined;
-
-    if (!features) {
-      return null;
-    }
-
-    // Metadata follows the convention: metadata.features.{feature-name}
-    const metadata = json.metadata as Record<string, unknown> | undefined;
-    const featureMetadata = metadata?.features as
-      | Record<string, FeatureManifestMetadata>
-      | undefined;
-
-    const rawConfig: RawFtFlagsConfig = {
-      features,
-      metadata: featureMetadata,
-    };
-
-    // Extract dependencies
-    const deps: PackageDependencies = {
+  return loadManifestFromConfigFile({
+    path: path ?? "./package.json",
+    type: "package.json",
+    extractDeps: (json) => ({
       dependencies: json.dependencies as Record<string, string> | undefined,
       optionalDependencies: json.optionalDependencies as Record<string, string> | undefined,
       peerDependencies: json.peerDependencies as Record<string, string> | undefined,
       devDependencies: json.devDependencies as Record<string, string> | undefined,
-    };
-
-    return parseManifest(rawConfig, {
-      type: "package.json",
-      path: configPath,
-    }, deps);
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      return null;
-    }
-    throw new ConfigLoadError(
-      `Failed to load package.json: ${error instanceof Error ? error.message : String(error)}`,
-      configPath,
-    );
-  }
+    }),
+  });
 }
 
 /**
