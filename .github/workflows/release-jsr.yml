@@ -77,7 +77,7 @@ jobs:
           echo "Generated Deno-specific README for JSR publish"
 
       - name: Publish to JSR
-        run: deno publish
+        run: deno publish --allow-dirty
 
       - name: Restore original README
         if: always()
