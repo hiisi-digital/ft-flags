@@ -13,7 +13,7 @@
 
 ## Overview
 
-`ft-flags` provides a robust feature flag system for TypeScript that follows the same conventions as Cargo features in Rust. Features can be:
+`ft-flags` provides a feature flag system for TypeScript that follows the same conventions as Cargo features in Rust. Features can be:
 
 - **Declared statically** in your `deno.json` or `package.json`
 - **Composed together** into feature sets
@@ -113,7 +113,7 @@ Feature names follow Cargo conventions:
 
 #### The `default` Feature
 
-The `default` feature is special — it lists the features that are enabled when no explicit feature selection is made. This is equivalent to Cargo's `default` feature.
+The `default` feature is special: it lists the features that are enabled when no explicit feature selection is made. This is equivalent to Cargo's `default` feature.
 
 ```json
 {
@@ -123,7 +123,7 @@ The `default` feature is special — it lists the features that are enabled when
 }
 ```
 
-To disable default features, use the `--no-default-features` CLI flag or set `defaultFeatures: false` in your config.
+To disable default features, use the `--no-default-features` CLI flag, set `FT_NO_DEFAULT_FEATURES=true` in the environment, or pass `noDefaultFeatures: true` to `resolveFeatures`.
 
 #### Feature Dependencies
 
@@ -258,13 +258,13 @@ my-app --all-features
 <!-- CLI_INSTALL:START -->
 
 ```bash
-# Global install via Deno
-deno install -A -n ft jsr:@hiisi/ft-flags/cli
+# global install via Deno
+deno install -g -A -n ft jsr:@hiisi/ft-flags/cli
 
-# Or run directly
+# or run directly
 deno run -A jsr:@hiisi/ft-flags/cli <command>
 
-# Or via deno task (when in a project with ft-flags)
+# or via a deno task, if your project defines one
 deno task ft <command>
 ```
 
@@ -274,23 +274,34 @@ deno task ft <command>
 
 #### `ft list`
 
-List all available features for the current package.
+List all available features for the current package, sorted alphabetically.
 
 ```bash
 $ ft list
 Available features:
-  default       -> [std]
-  std           -> [fs, env]
-  fs            -> []
-  env           -> []
-  experimental  -> []
+
+  args -> []
+  async-runtime -> []
+  default -> [std]
+  env -> []
+  experimental -> [async-runtime]
+  fs -> []
+  full -> [std, experimental]
+  std -> [fs, env]
 
 $ ft list --enabled
-Enabled features (with default):
+Enabled features:
+
   [ok] default
-  [ok] std
-  [ok] fs
-  [ok] env
+  [ok] env (via: default -> std -> env)
+  [ok] fs (via: default -> std -> fs)
+  [ok] std (via: default -> std)
+
+Disabled features:
+  [ ] args
+  [ ] async-runtime
+  [ ] experimental
+  [ ] full
 ```
 
 #### `ft check <feature>`
@@ -312,20 +323,23 @@ Exit codes: `0` if enabled, `1` if disabled.
 
 #### `ft resolve`
 
-Show the fully resolved set of enabled features.
+Show the fully resolved set of enabled features, sorted alphabetically. The command also prints the resolution options in effect.
 
 ```bash
 $ ft resolve
 Resolved features:
-  default, std, fs, env
+
+  default, env, fs, std
 
 $ ft resolve --features full --no-default-features
 Resolved features:
-  full, std, experimental, async-runtime, fs, env
+
+  async-runtime, env, experimental, fs, full, std
 
 $ ft resolve --all-features
 Resolved features:
-  default, std, full, experimental, async-runtime, fs, env, args
+
+  args, async-runtime, default, env, experimental, fs, full, std
 ```
 
 #### `ft tree [feature]`
@@ -335,6 +349,7 @@ Display the feature dependency tree.
 ```bash
 $ ft tree
 Feature tree:
+
 default
 `-- std
     |-- fs
@@ -348,6 +363,8 @@ full
 args
 
 $ ft tree full
+Feature tree:
+
 full
 |-- std
 |   |-- fs
@@ -365,16 +382,17 @@ $ ft validate
 [ok] Configuration is valid
 
 $ ft validate
-[x] Error: Circular dependency detected: full -> experimental -> full
-[x] Error: Unknown feature referenced: "nonexistent" in feature "std"
+Errors:
+  [x] Feature "std" references unknown feature "nonexistent"
+  [x] Circular dependency detected: full -> experimental -> full
 ```
 
 ### Package-Specific Queries
 
-Query features for a specific package in a workspace:
+Query features for a package in another directory. The `--package` flag takes a path to a directory containing a `deno.json` or `package.json`:
 
 ```bash
-$ ft list --package @myorg/subpackage
+$ ft list --package ./packages/my-lib
 $ ft check fs --package ./packages/my-lib
 ```
 
@@ -405,7 +423,7 @@ if (isFeatureEnabled("fs", resolved)) {
 
 // List all available features
 const available = listAvailableFeatures(manifest);
-console.log(available); // ["default", "std", "fs", ...]
+console.log(available); // sorted: ["default", "env", "fs", ...]
 ```
 
 <!-- IMPORT_EXAMPLE:END -->
@@ -456,18 +474,19 @@ if (isEnabled(registry, featureId("fs"))) {
 ### Schema Validation
 
 ```typescript
-import { validateManifest } from "@hiisi/ft-flags";
+import { parseManifest, validateManifest } from "@hiisi/ft-flags";
 
-const result = validateManifest({
+const manifest = parseManifest({
   features: {
     default: ["std"],
-    std: ["unknown-feature"], // Error!
+    std: ["unknown-feature"], // error: unknown reference
   },
 });
 
+const result = validateManifest(manifest);
 if (!result.valid) {
   console.error(result.errors);
-  // ["Unknown feature 'unknown-feature' referenced in 'std'"]
+  // ['Feature "std" references unknown feature "unknown-feature"']
 }
 ```
 
