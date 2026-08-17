@@ -503,7 +503,7 @@ Add to your `settings.json`:
   "json.schemas": [
     {
       "fileMatch": ["deno.json", "package.json"],
-      "url": "https://jsr.io/@hiisi/ft-flags/schema.json"
+      "url": "https://jsr.io/@hiisi/ft-flags/0.1.2/schema.json"
     }
   ]
 }
@@ -511,8 +511,10 @@ Add to your `settings.json`:
 
 ### Schema URL
 
+JSR serves package files under a version path, so the URL carries the version:
+
 ```
-https://jsr.io/@hiisi/ft-flags/schema.json
+https://jsr.io/@hiisi/ft-flags/0.1.2/schema.json
 ```
 
 ## Integration with cfg-ts
