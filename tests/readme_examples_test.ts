@@ -48,7 +48,12 @@ function typescriptBlocks(markdown: string): Block[] {
 function hardErrors(output: string): string[] {
   // deno colourises, so an anchored match against the raw stream never fires
   // and every failure reads as a snippet. This cost a whole audit pass once.
-  const plain = output.replace(/\[[0-9;]*m/g, "");
+  // The escape has to go with the bracket part: stripping only the brackets
+  // leaves "\x1bTS2307", so ^ still does not match. Harmless here only
+  // because whether deno colours a piped stream depends on the environment;
+  // in four other repos taking this same test the control did not turn red.
+  // deno-lint-ignore no-control-regex
+  const plain = output.replace(/\x1b\[[0-9;]*m/g, "");
   const codes = [...plain.matchAll(/^(TS\d+)\s*\[ERROR\]/gm)].map((m) => m[1]);
   return codes.filter((c) => !SNIPPET_CODES.has(c));
 }
