@@ -23,16 +23,12 @@
 
 This package serves as the foundation for conditional compilation in the `@hiisi/cfg-ts` ecosystem.
 
-<!-- PLATFORM_NOTICE:START -->
+> **Deno/JSR package:** This is the Deno-optimized version of ft-flags.
+> For Node.js or Bun, see [ft-flags on npm](https://www.npmjs.com/package/ft-flags).
 
-> **Multi-platform package:** This package is available for both Deno ([JSR](https://jsr.io/@hiisi/ft-flags)) and Node.js/Bun ([npm](https://www.npmjs.com/package/ft-flags)). We produce slightly different builds optimized for each platform, with equivalent JSR ↔ npm package mappings where applicable.
-
-<!-- PLATFORM_NOTICE:END -->
-
-<!-- SUPPORTED_VERSIONS:START -->
 ### Supported Runtimes
 
-The following runtimes and versions are tested in CI. The package may work on other versions, but only these are officially verified:
+This is the Deno-optimized package. The following versions are tested in CI:
 
 #### Deno
 
@@ -42,45 +38,29 @@ The following runtimes and versions are tested in CI. The package may work on ot
 
 _1.x is best-effort due to lockfile version incompatibility_
 
-#### Node.js
-
-| 18 | 20 | 22 |
-|:--:|:--:|:--:|
-| ✅ | ✅ | ✅ |
-
-#### Bun
-
-| 1.0 | latest |
-|:---:|:------:|
-| ✅ | ✅ |
-
-_Bun support is best-effort_
-
-<!-- SUPPORTED_VERSIONS:END -->
+For Node.js or Bun support, use the [npm package](https://www.npmjs.com/package/ft-flags).
 
 ## Installation
 
-<!-- INSTALL:START -->
+```typescript
+// Import directly from JSR
+import { loadManifest, resolveFeatures } from "jsr:@hiisi/ft-flags";
 
-```bash
-# Deno
-deno add jsr:@hiisi/ft-flags
-
-# npm / yarn / pnpm
-npm install ft-flags
+// Or add to your deno.json imports
+// "imports": { "@hiisi/ft-flags": "jsr:@hiisi/ft-flags@^0.1.0" }
 ```
 
-<!-- INSTALL:END -->
+Or using the Deno CLI:
+
+```bash
+deno add jsr:@hiisi/ft-flags
+```
 
 ## Feature Model
 
 ### Declaring Features
 
-<!-- CONFIG_FILE:START -->
-
-Features are declared at the root level of your `deno.json` or `package.json`. The format follows Cargo's conventions:
-
-<!-- CONFIG_FILE:END -->
+Features are declared at the root level of your `deno.json`. The format follows Cargo's conventions:
 
 ```json
 {
@@ -255,10 +235,8 @@ my-app --all-features
 
 ### Installation
 
-<!-- CLI_INSTALL:START -->
-
 ```bash
-# global install via Deno
+# global install
 deno install -g -A -n ft jsr:@hiisi/ft-flags/cli
 
 # or run directly
@@ -267,8 +245,6 @@ deno run -A jsr:@hiisi/ft-flags/cli <command>
 # or via a deno task, if your project defines one
 deno task ft <command>
 ```
-
-<!-- CLI_INSTALL:END -->
 
 ### Commands
 
@@ -400,8 +376,6 @@ $ ft check fs --package ./packages/my-lib
 
 ### Basic Usage
 
-<!-- IMPORT_EXAMPLE:START -->
-
 ```typescript
 import {
   isFeatureEnabled,
@@ -410,8 +384,10 @@ import {
   resolveFeatures,
 } from "@hiisi/ft-flags";
 
-// Load features from deno.json or package.json
+// Load features from deno.json. This returns null when no manifest declares
+// any, so it is checked before use rather than after a type error.
 const manifest = await loadManifest();
+if (!manifest) throw new Error("no features declared in deno.json");
 
 // Resolve with default features
 const resolved = resolveFeatures(manifest);
@@ -425,8 +401,6 @@ if (isFeatureEnabled("fs", resolved)) {
 const available = listAvailableFeatures(manifest);
 console.log(available); // sorted: ["default", "env", "fs", ...]
 ```
-
-<!-- IMPORT_EXAMPLE:END -->
 
 ### Custom Feature Selection
 
@@ -519,30 +493,26 @@ https://jsr.io/@hiisi/ft-flags/0.1.2/schema.json
 
 ## Integration with cfg-ts
 
-<!-- RELATED_IMPORT:START -->
-
-`ft-flags` is designed to work with `@hiisi/cfg-ts` for conditional compilation:
+`cfg-ts` is meant to consume these flags for conditional compilation. **It is not
+published yet**, so the shape below is what it will look like rather than something you
+can install today:
 
 ```typescript
-import { cfg } from "@hiisi/cfg-ts";
-
 // @cfg(feature("fs"))
 export function readFile(path: string): string {
-  // This function is only included when fs is enabled
+  return Deno.readTextFileSync(path); // only compiled in when fs is enabled
 }
 
 // @cfg(not(feature("experimental")))
 export function stableApi(): void {
-  // Only included when experimental is NOT enabled
+  // only compiled in when experimental is NOT enabled
 }
 
 // @cfg(all(feature("std"), not(feature("legacy"))))
 export function modernStdLib(): void {
-  // Complex predicates
+  // predicates compose
 }
 ```
-
-<!-- RELATED_IMPORT:END -->
 
 ## Comparison with Cargo
 
@@ -559,14 +529,10 @@ export function modernStdLib(): void {
 
 ## Related Packages
 
-<!-- RELATED_PACKAGES:START -->
-
-- [`@hiisi/cfg-ts`](https://jsr.io/@hiisi/cfg-ts) - Conditional compilation with `@cfg()` syntax
-- [`@hiisi/otso`](https://jsr.io/@hiisi/otso) - Build framework that orchestrates feature-based builds
-- [`@hiisi/tgts`](https://jsr.io/@hiisi/tgts) - Target definitions (runtime, platform, arch)
 - [`@hiisi/onlywhen`](https://jsr.io/@hiisi/onlywhen) - Runtime feature detection
 
-<!-- RELATED_PACKAGES:END -->
+Not published yet, so there is nothing to link: `cfg-ts` for `@cfg()` conditional
+compilation, `otso` for feature-driven builds, and `tgts` for target definitions.
 
 ## Support
 

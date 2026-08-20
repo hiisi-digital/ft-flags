@@ -107,8 +107,10 @@ import {
   resolveFeatures,
 } from "@hiisi/ft-flags";
 
-// Load features from deno.json
+// Load features from deno.json. This returns null when no manifest declares
+// any, so it is checked before use rather than after a type error.
 const manifest = await loadManifest();
+if (!manifest) throw new Error("no features declared in deno.json");
 
 // Resolve with default features
 const resolved = resolveFeatures(manifest);
@@ -124,32 +126,32 @@ console.log(available); // sorted: ["default", "env", "fs", ...]
 \`\`\``,
 
     RELATED_IMPORT:
-      `\`ft-flags\` is designed to work with \`@hiisi/cfg-ts\` for conditional compilation:
+      `\`cfg-ts\` is meant to consume these flags for conditional compilation. **It is not
+published yet**, so the shape below is what it will look like rather than something you
+can install today:
 
 \`\`\`typescript
-import { cfg } from "@hiisi/cfg-ts";
-
 // @cfg(feature("fs"))
 export function readFile(path: string): string {
-  // This function is only included when fs is enabled
+  return Deno.readTextFileSync(path); // only compiled in when fs is enabled
 }
 
 // @cfg(not(feature("experimental")))
 export function stableApi(): void {
-  // Only included when experimental is NOT enabled
+  // only compiled in when experimental is NOT enabled
 }
 
 // @cfg(all(feature("std"), not(feature("legacy"))))
 export function modernStdLib(): void {
-  // Complex predicates
+  // predicates compose
 }
 \`\`\``,
 
     RELATED_PACKAGES:
-      `- [\`@hiisi/cfg-ts\`](https://jsr.io/@hiisi/cfg-ts) - Conditional compilation with \`@cfg()\` syntax
-- [\`@hiisi/otso\`](https://jsr.io/@hiisi/otso) - Build framework that orchestrates feature-based builds
-- [\`@hiisi/tgts\`](https://jsr.io/@hiisi/tgts) - Target definitions (runtime, platform, arch)
-- [\`@hiisi/onlywhen\`](https://jsr.io/@hiisi/onlywhen) - Runtime feature detection`,
+      `- [\`@hiisi/onlywhen\`](https://jsr.io/@hiisi/onlywhen) - Runtime feature detection
+
+Not published yet, so there is nothing to link: \`cfg-ts\` for \`@cfg()\` conditional
+compilation, \`otso\` for feature-driven builds, and \`tgts\` for target definitions.`,
   },
 };
 
@@ -215,8 +217,10 @@ import {
   resolveFeatures,
 } from "ft-flags";
 
-// Load features from package.json
+// Load features from package.json. This returns null when no manifest declares
+// any, so it is checked before use rather than after a type error.
 const manifest = await loadManifest();
+if (!manifest) throw new Error("no features declared in package.json");
 
 // Resolve with default features
 const resolved = resolveFeatures(manifest);
@@ -231,32 +235,32 @@ const available = listAvailableFeatures(manifest);
 console.log(available); // sorted: ["default", "env", "fs", ...]
 \`\`\``,
 
-    RELATED_IMPORT: `\`ft-flags\` is designed to work with \`cfg-ts\` for conditional compilation:
+    RELATED_IMPORT: `\`cfg-ts\` is meant to consume these flags for conditional compilation.
+**It is not published yet**, so the shape below is what it will look like rather than
+something you can install today:
 
 \`\`\`typescript
-import { cfg } from "cfg-ts";
-
 // @cfg(feature("fs"))
 export function readFile(path: string): string {
-  // This function is only included when fs is enabled
+  return require("node:fs").readFileSync(path, "utf8"); // only when fs is enabled
 }
 
 // @cfg(not(feature("experimental")))
 export function stableApi(): void {
-  // Only included when experimental is NOT enabled
+  // only compiled in when experimental is NOT enabled
 }
 
 // @cfg(all(feature("std"), not(feature("legacy"))))
 export function modernStdLib(): void {
-  // Complex predicates
+  // predicates compose
 }
 \`\`\``,
 
     RELATED_PACKAGES:
-      `- [\`cfg-ts\`](https://www.npmjs.com/package/cfg-ts) - Conditional compilation with \`@cfg()\` syntax
-- [\`otso\`](https://www.npmjs.com/package/otso) - Build framework that orchestrates feature-based builds
-- [\`tgts\`](https://www.npmjs.com/package/tgts) - Target definitions (runtime, platform, arch)
-- [\`onlywhen\`](https://www.npmjs.com/package/onlywhen) - Runtime feature detection`,
+      `- [\`onlywhen\`](https://www.npmjs.com/package/onlywhen) - Runtime feature detection
+
+Not published yet, so there is nothing to link: \`cfg-ts\` for \`@cfg()\` conditional
+compilation, \`otso\` for feature-driven builds, and \`tgts\` for target definitions.`,
   },
 };
 
