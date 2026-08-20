@@ -89,13 +89,13 @@ deno add jsr:@hiisi/ft-flags
       `Features are declared at the root level of your \`deno.json\`. The format follows Cargo's conventions:`,
 
     CLI_INSTALL: `\`\`\`bash
-# Global install
-deno install -A -n ft jsr:@hiisi/ft-flags/cli
+# global install
+deno install -g -A -n ft jsr:@hiisi/ft-flags/cli
 
-# Or run directly
+# or run directly
 deno run -A jsr:@hiisi/ft-flags/cli <command>
 
-# Or via deno task (when in a project with ft-flags)
+# or via a deno task, if your project defines one
 deno task ft <command>
 \`\`\``,
 
@@ -120,7 +120,7 @@ if (isFeatureEnabled("fs", resolved)) {
 
 // List all available features
 const available = listAvailableFeatures(manifest);
-console.log(available); // ["default", "std", "fs", ...]
+console.log(available); // sorted: ["default", "env", "fs", ...]
 \`\`\``,
 
     RELATED_IMPORT:
@@ -228,7 +228,7 @@ if (isFeatureEnabled("fs", resolved)) {
 
 // List all available features
 const available = listAvailableFeatures(manifest);
-console.log(available); // ["default", "std", "fs", ...]
+console.log(available); // sorted: ["default", "env", "fs", ...]
 \`\`\``,
 
     RELATED_IMPORT: `\`ft-flags\` is designed to work with \`cfg-ts\` for conditional compilation:

@@ -46,7 +46,7 @@
  * });
  *
  * // Check if features are enabled
- * if (isEnabled(featureId("fs"), registry)) {
+ * if (isEnabled(registry, featureId("fs"))) {
  *   // Use filesystem features
  * }
  * ```
