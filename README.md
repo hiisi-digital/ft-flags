@@ -56,21 +56,28 @@ As the `ft` command:
 
 ```bash
 # deno, straight from jsr, no build in the way
-deno install --global --allow-read --allow-write jsr:@hiisi/ft-flags/cli
+deno install --global --allow-read --allow-write --name ft jsr:@hiisi/ft-flags/cli
 
 # node
-npm install -g ft-flags
+npm install -g @hiisi/ft-flags
 
 # bun
-bun install -g ft-flags
+bun install -g @hiisi/ft-flags
 
 # or without installing anything
 deno run --allow-read --allow-write jsr:@hiisi/ft-flags/cli
-npx ft-flags
-bunx ft-flags
+npx @hiisi/ft-flags
+bunx @hiisi/ft-flags
 ```
 
-It reads a manifest and writes resolved output, which is what the two permissions are for.
+It reads a manifest and writes resolved output, which is what the two permissions
+are for. `--name` is not optional in practice: deno infers the executable from the
+file stem, treats `cli` as generic, and falls back to a name derived from the path,
+so without it the command is not called `ft`.
+
+The npm and bun lines need the package on npm, and it is on jsr only so far. Until
+that lands, the deno lines are the ones that work and the npm registry will answer
+a 404.
 
 Or using the Deno CLI:
 

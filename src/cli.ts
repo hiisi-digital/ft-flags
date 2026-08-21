@@ -3,11 +3,11 @@
  * CLI tool for querying and validating feature flags.
  *
  * Usage:
- *   ft-flags list [--enabled] [--available]
- *   ft-flags check <feature> [--features <f1,f2>] [--no-default-features]
- *   ft-flags resolve [--features <f1,f2>] [--no-default-features] [--all-features]
- *   ft-flags tree [<feature>]
- *   ft-flags validate
+ *   ft list [--enabled] [--available]
+ *   ft check <feature> [--features <f1,f2>] [--no-default-features]
+ *   ft resolve [--features <f1,f2>] [--no-default-features] [--all-features]
+ *   ft tree [<feature>]
+ *   ft validate
  */
 
 import {
@@ -461,7 +461,7 @@ export async function main(args: string[]): Promise<number> {
       const feature = parsed.positional[0];
       if (!feature) {
         console.error(failure("Missing feature argument"));
-        console.error("Usage: ft-flags check <feature>");
+        console.error("Usage: ft check <feature>");
         return 1;
       }
       return cmdCheck(manifest, feature, parsed.flags);
