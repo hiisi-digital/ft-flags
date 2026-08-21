@@ -33,8 +33,8 @@ This is the Deno-optimized package. The following versions are tested in CI:
 #### Deno
 
 | 1.x | 2.x |
-|:---:|:---:|
-| ⚠️ | ✅ |
+| :-: | :-: |
+| ⚠️  | ✅  |
 
 _1.x is best-effort due to lockfile version incompatibility_
 
