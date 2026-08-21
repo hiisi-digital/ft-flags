@@ -42,6 +42,8 @@ For Node.js or Bun support, use the [npm package](https://www.npmjs.com/package/
 
 ## Installation
 
+As a library:
+
 ```typescript
 // Import directly from JSR
 import { loadManifest, resolveFeatures } from "jsr:@hiisi/ft-flags";
@@ -49,6 +51,26 @@ import { loadManifest, resolveFeatures } from "jsr:@hiisi/ft-flags";
 // Or add to your deno.json imports
 // "imports": { "@hiisi/ft-flags": "jsr:@hiisi/ft-flags@^0.1.0" }
 ```
+
+As the `ft` command:
+
+```bash
+# deno, straight from jsr, no build in the way
+deno install --global --allow-read --allow-write jsr:@hiisi/ft-flags/cli
+
+# node
+npm install -g ft-flags
+
+# bun
+bun install -g ft-flags
+
+# or without installing anything
+deno run --allow-read --allow-write jsr:@hiisi/ft-flags/cli
+npx ft-flags
+bunx ft-flags
+```
+
+It reads a manifest and writes resolved output, which is what the two permissions are for.
 
 Or using the Deno CLI:
 
