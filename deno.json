@@ -87,5 +87,37 @@
       ".githooks/",
       "npm/"
     ]
+  },
+  "repository": "https://github.com/hiisi-digital/ft-flags",
+  "distDir": "target",
+  "dist": {
+    "node": {
+      "runtime": "node",
+      "versions": [
+        "20",
+        "22",
+        "24"
+      ],
+      "plugins": [
+        {
+          "id": "deno-to-node",
+          "options": {
+            "cjs": false,
+            "shims": {
+              "deno": true
+            }
+          }
+        }
+      ]
+    },
+    "bun": {
+      "runtime": "bun",
+      "versions": [
+        "latest"
+      ],
+      "plugins": [
+        "deno-to-bun"
+      ]
+    }
   }
 }
