@@ -17,7 +17,6 @@ import {
   type FeatureRegistry,
   type FeatureSchema,
   type FeatureState,
-  type FeatureStateReason,
   type ResolvedConfig,
 } from "./types.ts";
 
@@ -211,15 +210,47 @@ export function setFeatureState(
   id: FeatureId,
   enabled: boolean,
 ): FeatureRegistry {
+  return setFeatureStates(registry, [[id, enabled]]);
+}
+
+/**
+ * Sets several features at once, returning a new registry.
+ *
+ * The registry is immutable, so every state change copies the state map. Setting flags one
+ * at a time therefore copies it once per flag, and applying a manifest of a thousand
+ * features is a thousand copies of a thousand-entry map. This copies it once.
+ *
+ * Later entries win over earlier ones for the same id, which is what a caller building a
+ * list from layered sources expects.
+ *
+ * @param registry - The current registry
+ * @param entries - Pairs of feature id and whether it is enabled
+ * @returns A new registry with all of the states applied
+ *
+ * @example
+ * ```ts
+ * import { createSimpleRegistry, isEnabled, setFeatureStates } from "@hiisi/ft-flags";
+ *
+ * const registry = createSimpleRegistry(["alpha", "beta", "gamma"]);
+ * const updated = setFeatureStates(registry, [["alpha", true], ["gamma", true]]);
+ *
+ * console.log(isEnabled(updated, "alpha")); // true
+ * console.log(isEnabled(updated, "beta")); // false
+ * ```
+ */
+export function setFeatureStates(
+  registry: FeatureRegistry,
+  entries: Iterable<readonly [FeatureId, boolean]>,
+): FeatureRegistry {
   const newStates = new Map(registry.states);
 
-  const reason: FeatureStateReason = enabled ? "explicit-enabled" : "explicit-disabled";
-
-  newStates.set(id, {
-    enabled,
-    reason,
-    source: { type: "programmatic" },
-  });
+  for (const [id, enabled] of entries) {
+    newStates.set(id, {
+      enabled,
+      reason: enabled ? "explicit-enabled" : "explicit-disabled",
+      source: { type: "programmatic" },
+    });
+  }
 
   return {
     schema: registry.schema,

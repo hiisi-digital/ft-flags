@@ -164,6 +164,7 @@ export {
   mergeRegistries,
   requireFeature,
   setFeatureState,
+  setFeatureStates,
 } from "./src/registry.ts";
 
 export type { CreateRegistryOptions } from "./src/registry.ts";
