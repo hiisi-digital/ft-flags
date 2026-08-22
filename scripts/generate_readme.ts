@@ -19,6 +19,26 @@
  */
 
 // =============================================================================
+// The version this package is, which the install lines have to agree with
+// =============================================================================
+
+/**
+ * The caret constraint a reader should be told to depend on.
+ *
+ * Read from the manifest rather than written out here, because the two go out
+ * of step silently: this file said `^0.1.0` while the package was 0.2.0, and on
+ * a `0.x` version a caret pins the minor, so anybody following the readme got
+ * 0.1.x and would never have seen 0.2 at all. Nothing failed, nothing warned,
+ * and the only symptom was people running an old package.
+ */
+const VERSION: string = JSON.parse(
+  Deno.readTextFileSync(new URL("../deno.json", import.meta.url)),
+).version;
+
+/** The caret form, which is what an install line documents. */
+export const CONSTRAINT: string = `^${VERSION}`;
+
+// =============================================================================
 // Platform-specific content replacements
 // =============================================================================
 
@@ -76,7 +96,7 @@ For Node.js or Bun support, use the [npm package](https://www.npmjs.com/package/
 import { loadManifest, resolveFeatures } from "jsr:@hiisi/ft-flags";
 
 // Or add to your deno.json imports
-// "imports": { "@hiisi/ft-flags": "jsr:@hiisi/ft-flags@^0.1.0" }
+// "imports": { "@hiisi/ft-flags": "jsr:@hiisi/ft-flags@${CONSTRAINT}" }
 \`\`\`
 
 Or using the Deno CLI:

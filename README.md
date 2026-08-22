@@ -32,9 +32,9 @@ This is the Deno-optimized package. The following versions are tested in CI:
 
 #### Deno
 
-| 1.x | 2.x |
-| :-: | :-: |
-| partial  | yes  |
+|   1.x   | 2.x |
+| :-----: | :-: |
+| partial | yes |
 
 _1.x is best-effort due to lockfile version incompatibility_
 
@@ -49,7 +49,7 @@ As a library:
 import { loadManifest, resolveFeatures } from "jsr:@hiisi/ft-flags";
 
 // Or add to your deno.json imports
-// "imports": { "@hiisi/ft-flags": "jsr:@hiisi/ft-flags@^0.1.0" }
+// "imports": { "@hiisi/ft-flags": "jsr:@hiisi/ft-flags@^0.2.0" }
 ```
 
 As the `ft` command:
