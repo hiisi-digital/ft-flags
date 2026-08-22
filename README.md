@@ -34,7 +34,7 @@ This is the Deno-optimized package. The following versions are tested in CI:
 
 | 1.x | 2.x |
 | :-: | :-: |
-| ⚠️  | ✅  |
+| partial  | yes  |
 
 _1.x is best-effort due to lockfile version incompatibility_
 
