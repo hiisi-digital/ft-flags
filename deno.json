@@ -14,7 +14,10 @@
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@^1.0.0",
-    "@std/testing": "jsr:@std/testing@^1.0.0"
+    "@std/testing": "jsr:@std/testing@^1.0.0",
+    "@hiisi/viola": "jsr:@hiisi/viola@^0.3.1",
+    "@hiisi/viola-default-lints": "jsr:@hiisi/viola-default-lints@^0.3.1",
+    "@hiisi/viola-grammar-ts": "jsr:@hiisi/viola-grammar-ts@^0.3.1"
   },
   "lint": {
     "include": [
@@ -64,7 +67,7 @@
   "tasks": {
     "test": "deno test --allow-read --allow-write --allow-env --allow-run --allow-net",
     "test:watch": "deno test --allow-read --allow-write --allow-env --allow-run --allow-net --watch",
-    "lint": "deno lint",
+    "lint": "deno run -A --min-dep-age=0 jsr:@hiisi/viola-cli@^0.3.1 --project . --include src,mod.ts",
     "lint:fix": "deno lint --fix",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
@@ -131,5 +134,6 @@
         "deno-passthrough"
       ]
     }
-  }
+  },
+  "minimumDependencyAge": 0
 }
