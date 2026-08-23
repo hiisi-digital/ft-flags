@@ -16,9 +16,10 @@ export default viola()
   .use(defaultLints)
   // the grammar is what turns a file into something a lint can ask questions of
   .add(typescript).as("typescript")
-  // anything a linter is at all sure about is a failure. a warning is a
-  // finding nobody acts on, and a gate that warns is not a gate.
-  .rule(report.error, when.confidence.atLeast(50))
+  // anything a linter has any confidence in at all is a failure. a warning
+  // is a finding nobody acts on, and a gate that warns is not a gate. the
+  // floor was 50 and everything under it passed silently.
+  .rule(report.error, when.confidence.atLeast(1))
   // tests are held to the same bar as source. a fixture that drifts is how a
   // suite stops measuring the thing it names.
   .rule(report.error, when.in("tests/**/*.ts"))
