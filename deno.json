@@ -1,6 +1,6 @@
 {
   "name": "@hiisi/ft-flags",
-  "version": "0.2.0-alpha.1",
+  "version": "0.2.1",
   "description": "Feature flags for TypeScript with Cargo-style feature definitions, conditional compilation, and CLI tooling.",
   "license": "MPL-2.0",
   "exports": {
