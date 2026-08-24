@@ -10,15 +10,11 @@
 
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { afterAll, beforeAll, describe, it } from "@std/testing/bdd";
+import { runCli, type TestPackage } from "./helpers.ts";
 
 // =============================================================================
 // Test Setup
 // =============================================================================
-
-interface TestPackage {
-  name: string;
-  config: Record<string, unknown>;
-}
 
 let tempDir: string;
 
@@ -124,7 +120,7 @@ const testPackages: TestPackage[] = [
   },
 ];
 
-async function createTestPackages(): Promise<string> {
+async function createDenoTestPackages(): Promise<string> {
   const dir = await Deno.makeTempDir({ prefix: "ft-flags-test-" });
 
   await Promise.all(
@@ -141,36 +137,13 @@ async function createTestPackages(): Promise<string> {
   return dir;
 }
 
-async function runCli(
-  packagePath: string,
-  args: string[],
-): Promise<{ code: number; output: string }> {
-  const cliPath = new URL("../../src/cli.ts", import.meta.url).pathname;
-
-  const command = new Deno.Command(Deno.execPath(), {
-    args: ["run", "--allow-read", "--allow-env", cliPath, "--package", packagePath, ...args],
-    stdout: "piped",
-    stderr: "piped",
-    env: { NO_COLOR: "1" }, // Disable colors for easier testing
-  });
-
-  const process = await command.output();
-  const stdout = new TextDecoder().decode(process.stdout);
-  const stderr = new TextDecoder().decode(process.stderr);
-
-  return {
-    code: process.code,
-    output: stdout + stderr,
-  };
-}
-
 // =============================================================================
 // Tests
 // =============================================================================
 
 describe("CLI Multi-Package Integration (deno.json)", () => {
   beforeAll(async () => {
-    tempDir = await createTestPackages();
+    tempDir = await createDenoTestPackages();
   });
 
   afterAll(async () => {

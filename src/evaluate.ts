@@ -95,6 +95,25 @@ export function checkFeature(
 }
 
 /**
+ * Whether the ids are all enabled, or any of them are.
+ *
+ * `stopAt` is the answer that ends the loop and the answer when it does: `all`
+ * stops at the first disabled and is otherwise true, `any` stops at the first
+ * enabled and is otherwise false. Written twice they were the same fold with
+ * one bit flipped, and two places to get the short-circuit wrong.
+ */
+function quantify(
+  ids: FeatureId[],
+  registry: FeatureRegistry,
+  stopAt: boolean,
+): boolean {
+  for (const id of ids) {
+    if (isEnabled(id, registry) === stopAt) return stopAt;
+  }
+  return !stopAt;
+}
+
+/**
  * Check if all specified features are enabled.
  *
  * @param ids - The feature IDs to check
@@ -102,12 +121,7 @@ export function checkFeature(
  * @returns true if ALL features are enabled
  */
 export function allEnabled(ids: FeatureId[], registry: FeatureRegistry): boolean {
-  for (const id of ids) {
-    if (!isEnabled(id, registry)) {
-      return false;
-    }
-  }
-  return true;
+  return quantify(ids, registry, false);
 }
 
 /**
@@ -118,12 +132,7 @@ export function allEnabled(ids: FeatureId[], registry: FeatureRegistry): boolean
  * @returns true if ANY feature is enabled
  */
 export function anyEnabled(ids: FeatureId[], registry: FeatureRegistry): boolean {
-  for (const id of ids) {
-    if (isEnabled(id, registry)) {
-      return true;
-    }
-  }
-  return false;
+  return quantify(ids, registry, true);
 }
 
 /**
@@ -195,10 +204,7 @@ export function whenEnabled<T>(
   registry: FeatureRegistry,
   fn: () => T,
 ): T | undefined {
-  if (isEnabled(id, registry)) {
-    return fn();
-  }
-  return undefined;
+  return isEnabled(id, registry) ? fn() : undefined;
 }
 
 /**
@@ -214,10 +220,7 @@ export function whenDisabled<T>(
   registry: FeatureRegistry,
   fn: () => T,
 ): T | undefined {
-  if (!isEnabled(id, registry)) {
-    return fn();
-  }
-  return undefined;
+  return isDisabled(id, registry) ? fn() : undefined;
 }
 
 /**

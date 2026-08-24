@@ -403,6 +403,12 @@ ${colorize("ENVIRONMENT:", "bold")}
 // Main Entry Point
 // =============================================================================
 
+/**
+ * Run the cli.
+ *
+ * @param args The arguments, without the executable.
+ * @returns The exit status the caller should use.
+ */
 export async function main(args: string[]): Promise<number> {
   const parsed = parseArgs(args);
 

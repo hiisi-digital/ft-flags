@@ -292,19 +292,30 @@ export function listFeatures(registry: FeatureRegistry): FeatureId[] {
 }
 
 /**
+ * Every feature whose enabled state matches `want`.
+ *
+ * The two callers below differed in one `!`, which is a poor thing to have two
+ * copies of: the one that drifts is the one nobody was looking at.
+ */
+function featuresWhere(
+  registry: FeatureRegistry,
+  want: boolean,
+): FeatureId[] {
+  const out: FeatureId[] = [];
+  for (const [id, state] of registry.states) {
+    if (state.enabled === want) out.push(id);
+  }
+  return out;
+}
+
+/**
  * Lists all enabled feature IDs.
  *
  * @param registry - The feature registry
  * @returns Array of enabled feature IDs
  */
 export function listEnabledFeatures(registry: FeatureRegistry): FeatureId[] {
-  const enabled: FeatureId[] = [];
-  for (const [id, state] of registry.states) {
-    if (state.enabled) {
-      enabled.push(id);
-    }
-  }
-  return enabled;
+  return featuresWhere(registry, true);
 }
 
 /**
@@ -314,13 +325,7 @@ export function listEnabledFeatures(registry: FeatureRegistry): FeatureId[] {
  * @returns Array of disabled feature IDs
  */
 export function listDisabledFeatures(registry: FeatureRegistry): FeatureId[] {
-  const disabled: FeatureId[] = [];
-  for (const [id, state] of registry.states) {
-    if (!state.enabled) {
-      disabled.push(id);
-    }
-  }
-  return disabled;
+  return featuresWhere(registry, false);
 }
 
 /**
