@@ -27,17 +27,6 @@ export interface ValidationResult {
 }
 
 /**
- * Creates an empty validation result.
- */
-export function createEmptyValidationResult(): ValidationResult {
-  return {
-    valid: true,
-    errors: [],
-    warnings: [],
-  };
-}
-
-/**
  * Merges multiple validation results into one.
  */
 export function mergeValidationResults(
